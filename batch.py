@@ -17,12 +17,12 @@ import sys
 import cv2
 import glob
 import time
-import ipdb
+#import ipdb
 
 
 class Video_class(object):
 
-    def __init__(self, video_path):
+    def __init__(self, video_path, max_frames=-1):
         self.comm = mpi.COMM_WORLD
         self.size = self.comm.Get_size()
         self.rank = self.comm.Get_rank()
@@ -30,10 +30,26 @@ class Video_class(object):
         self.video_path = video_path
         self.cap = cv2.VideoCapture(video_path)
         self.f_rate = self.cap.get(cv2.cv.CV_CAP_PROP_FPS)
-        self.frames = int(self.cap.get(cv2.cv.CV_CAP_PROP_FRAME_COUNT))
+        if max_frames < 1:
+            max_frames = self.frames = int(self.cap.get(cv2.cv.CV_CAP_PROP_FRAME_COUNT))
         self.f_sec = 1 / self.f_rate
         self.width = int(self.cap.get(cv2.cv.CV_CAP_PROP_FRAME_WIDTH))
         self.height = int(self.cap.get(cv2.cv.CV_CAP_PROP_FRAME_HEIGHT))
+
+        #h is the step size. Essentially you want one frame at a time!
+        self.h = 1
+
+        #just a random stating point
+        self.a = 0
+
+        #local_i is the number of frames each processor will use
+        self.local_i = max_frames / ( self.size )
+
+        #calculate interval that each process handles
+        self.local_startframe = self.a + ( self.rank ) * self.local_i * self.h
+        self.local_endframe = self.local_startframe + self.local_i * self.h - 1
+
+        #print self.local_startframe , self.local_endframe , self.rank
 
     def video_to_image(self, step_size=1, frame_start=0):
         '''Takes the videos and outputs frames into images'''
@@ -71,6 +87,7 @@ class Video_class(object):
                 cv2.imwrite(temp_folder + "frame%.7d.jpg" % i, image)
         comm.Barrier()
 
+    #def make_master_im(self, max_frames=-1, self.local_startframe, self.local_endframe):
     def make_master_im(self, max_frames=-1):
         '''makes master in memory'''
         if max_frames < 1:
@@ -82,7 +99,9 @@ class Video_class(object):
         sample = np.unravel_index(np.random.randint(0, len(self.master_image.ravel())),self.master_image.shape)
         out.append(self.master_image[sample])
         self.master_image = np.asarray(self.master_image, dtype=float)
-        for image_no in xrange(1, max_frames):
+        #for image_no in xrange(1, max_frames):
+        for image_no in xrange(self.local_startframe, self.local_endframe, 1):
+            #print self.local_startframe, self.local_endframe
             per_done = self.cap.get(cv2.cv.CV_CAP_PROP_POS_AVI_RATIO)*100.
             #if per_done % 10 == 0:
             print '%2.0f Percent Done'%per_done, image_no
@@ -104,11 +123,12 @@ class Video_class(object):
         
         self.frame_no = []
         self.frame_chi = []
-        self.cap.set(cv2.cv.CV_CAP_PROP_POS_FRAMES, 0)
         print "About to start doing Chi-squared"
         x, y, z = self.master_image.shape
         ddof = x*y
-        for i_base in xrange(0, max_frames):
+        #for i_base in xrange(0, max_frames):
+        for i_base in xrange(self.local_startframe, self.local_endframe, 1):
+            self.cap.set(cv2.cv.CV_CAP_PROP_POS_FRAMES, i_base)
             per_done = self.cap.get(cv2.cv.CV_CAP_PROP_POS_AVI_RATIO)*100.
             #if per_done % 10 == 0:
             print '%2.0f Percent Done'%per_done, i_base
@@ -242,9 +262,11 @@ def chisquare(f_obs, f_exp, axis=0):
 
 if __name__ == '__main__':
 
-    video = Video_class('00016.MTS')
-    freq = video.make_master_im(30)
+    # Set the Number of frames wished
+    frames = 30
+    video = Video_class('00016.MTS', frames)
+    freq = video.make_master_im(frames)
     #plt.hist(freq, 5)
     #plt.show()
-    video.image_chi(30)
-    video.plot()
+    video.image_chi(frames)
+    #video.plot()
