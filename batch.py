@@ -29,7 +29,7 @@ class Video_class(object):
         #video info
         self.video_path = video_path
         self.cap = cv2.VideoCapture(video_path)
-        self.f_rate = self.cap.get(cv2.cv.CV_CAP_PROP_FPS)
+        self.f_rate = int(self.cap.get(cv2.cv.CV_CAP_PROP_FPS))
         self.frames = int(self.cap.get(cv2.cv.CV_CAP_PROP_FRAME_COUNT))
         self.f_sec = 1 / self.f_rate
         self.width = int(self.cap.get(cv2.cv.CV_CAP_PROP_FRAME_WIDTH))
@@ -52,14 +52,16 @@ class Video_class(object):
 
     def make_master_im(self, max_frames=-1, step=-1):
         '''makes master in memory'''
-        if max_frames < 1:
+        if max_frames < 1 and step < 1:
             max_frames = self.frames
-        ''' NEED TO THINK A LITTLE MORE WHT IS GOING ON HERE '''
-        ''' only want to change step to match max_frames otherwise use self.f_rate'''
-        if max_frames < 1 and step == self.f_rate:
             step = self.f_rate
-        else:
+        elif max_frames < 1 and step >= 1:
+            max_frames = self.frames
+        elif max_frames >= 1 and step < 1:
             step = self.local_i / (max_frames / self.size)
+
+        print step, max_frames
+
         #print self.local_i, step, max_frames / self.size
         #initalize master image
         out = []
@@ -70,7 +72,7 @@ class Video_class(object):
         #for image_no in xrange(1, max_frames):
         for image_no in xrange(self.local_startframe, self.local_endframe, step):
             self.cap.set(cv2.cv.CV_CAP_PROP_POS_FRAMES, image_no)
-            #print image_no, self.local_startframe, self.local_endframe, self.frames
+            print image_no, step, self.local_startframe, self.local_endframe, self.frames
             #per_done = self.cap.get(cv2.cv.CV_CAP_PROP_POS_AVI_RATIO)*100.
             #per_done = self.cap.get(cv2.cv.CV_CAP_PROP_POS_FRAMES)100.
             #if per_done % 10 == 0:
@@ -88,13 +90,12 @@ class Video_class(object):
         '''
         Calculate chi squared on the images
         '''
-        if max_frames < 1:
+        if max_frames < 1 and step < 1:
             max_frames = self.frames
-        ''' NEED TO THINK A LITTLE MORE WHT IS GOING ON HERE '''
-        ''' only want to change step to match max_frames otherwise use self.f_rate'''
-        if max_frames < 1 and step == self.f_rate:
             step = self.f_rate
-        else:
+        elif max_frames < 1 and step >= 1:
+            max_frames = self.frames
+        elif max_frames >= 1 and step < 1:
             step = self.local_i / (max_frames / self.size)
         
         self.frame_no = []
@@ -105,7 +106,7 @@ class Video_class(object):
         #for i_base in xrange(0, max_frames):
         for i_base in xrange(self.local_startframe, self.local_endframe, step):
             self.cap.set(cv2.cv.CV_CAP_PROP_POS_FRAMES, i_base)
-            print i_base, self.local_startframe, self.local_endframe, self.frames 
+            print i_base, step, self.local_startframe, self.local_endframe, self.frames 
             #per_done = self.cap.get(cv2.cv.CV_CAP_PROP_POS_AVI_RATIO)*100.
             #if per_done % 10 == 0:
             #print '%2.0f Percent Done'%per_done, i_base
@@ -129,49 +130,59 @@ class Video_class(object):
         self.comm.Barrier()
     #THIS FILE OUTPUT WILL BE USED FOR POSTPROCESSING IF NEEDS BE
 
-    def plot(self):
-        if self.rank == 1:
-            print "I am about to start drawing those amazing figures you really want to see!"
-            majorLocator   = MultipleLocator(5)
-            majorFormatter = FormatStrFormatter('%d')
-            minorLocator   = MultipleLocator(1)
+    def plot(self, individual=True):
+        print "I am about to start drawing those amazing figures you really want to see!"
+        majorLocator   = MultipleLocator(5)
+        majorFormatter = FormatStrFormatter('%d')
+        minorLocator   = MultipleLocator(1)
 
-            frame_no, frame_chi = self.frame_no, self.frame_chi
-            frameTime = frame_no / 60.
-            redChi = frame_chi
+        frame_no, frame_chi = self.frame_no, self.frame_chi
+        frameTime = frame_no / 60.
+        redChi = frame_chi
 
-            minTime, maxTime = min(frameTime), max(frameTime)
-            minChi, maxChi = min(redChi), max(redChi)
-            averageChi = float(sum(redChi) / len(redChi))
+        self.dpi = 600
 
-            #plt.axhline(y=3*minChi)
+        minTime, maxTime = min(frameTime), max(frameTime)
+        minChi, maxChi = min(redChi), max(redChi)
+        averageChi = float(sum(redChi) / len(redChi))
 
-            ax = plt.subplot(1, 1, 1)
-            #plt.figure()
-            ax.xaxis.set_major_locator(majorLocator)
-            ax.xaxis.set_major_formatter(majorFormatter)
-            ax.xaxis.set_minor_locator(minorLocator)
+        #plt.axhline(y=3*minChi)
+
+        ax = plt.subplot(1, 1, 1)
+        #plt.figure()
+        ax.xaxis.set_major_locator(majorLocator)
+        ax.xaxis.set_major_formatter(majorFormatter)
+        ax.xaxis.set_minor_locator(minorLocator)
     
-            plt.tick_params(axis='both', which='major', length=10)
-            plt.tick_params(axis='both', which='minor', length=5)
+        plt.tick_params(axis='both', which='major', length=10)
+        plt.tick_params(axis='both', which='minor', length=5)
         
-            #plt.ylim([minChi, maxChi])
-            #plt.xlim([minTime, maxTime])
-            #plt.xlabel("Time (min)")
-            #plt.ylabel("Reduced Chi-squared")
+        #plt.ylim([minChi, maxChi])
+        #plt.xlim([minTime, maxTime])
+        #plt.xlabel("Time (min)")
+        #plt.ylabel("Reduced Chi-squared")
 
-            plt.gca().set_yscale('log')
+        plt.gca().set_yscale('log')
 
-            xpos, ypos = float(minTime), float(maxChi/1.5)
-            plt.text(xpos, ypos, self.video_path)
+        xpos, ypos = float(minTime), float(maxChi/1.5)
+        plt.text(xpos, ypos, self.video_path)
 
-            plt.plot(frameTime,redChi, 'r-')
-
+        if individual == False:
+            if self.rank == 1:
+                plt.plot(frameTime,redChi, 'r-')
+                plt.savefig(self.video_path + ".jpg", dpi=self.dpi)
+                plt.clf()
+        elif individual == True:
+            for i in xrange(len(frameTime)):
+                pos = float(i / 60.)
+                plt.axvline(x=pos)      
+                plt.plot(frameTime, redChi, 'k-')
+                plt.savefig(output, dpi=self.dpi)
+                plt.clf()
         #plt.savefig(temp_folder + "reduced.eps")
         #plt.savefig(rootfile + ".eps")
         #ipdb.set_trace()
         #plt.show()
-            plt.savefig(self.video_path + ".jpg")
         '''
         for i in xrange(len(frameTime)):
             output = (temp_folder + "image%.7d.jpg" % i)
@@ -244,6 +255,6 @@ if __name__ == '__main__':
     freq = video.make_master_im(frames)
     #plt.hist(freq, 5)
     #plt.show()
-    video.image_chi(frames)
+    video.image_chi()
     #video.plot()
     #video.make_movie()
