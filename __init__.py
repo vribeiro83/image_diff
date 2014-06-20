@@ -279,6 +279,22 @@ class Video_class(object):
         else:
             self.comm.send((frame_no, frame_time, frame_chi), dest=0)
             
+    def save_result(self, filename=None):
+        '''Saves results to a .csv file  with 3 colmns [frame_num,frame_time
+        frame_chi].
+        If no files name given with be video_name.csv'''
+        if filename is None:
+            outfile = os.path.splitext(self.video_path)[0] + '.csv'
+        else:
+            outfile = os.path.splitext(filename)[0] + '.csv'
+
+        if not hasattr(self, 'frame_no'):
+            raise AttributeError('Must get reduiced chi squared first')
+        
+        out_array = np.vstack((self.frame_no, self.frame_time,
+                               self.frame_chi)).T
+        np.savetxt(outfile, out_array, delimiter=',',
+                   header='frame_number, frame_time, frame_chi')
         
     
 def chisquare(f_obs, f_exp, axis=0):
@@ -291,7 +307,7 @@ if __name__ == '__main__':
     import cPickle as pik
     # Test multiprocessing
     #frames = 10000
-    video = Video_class('00016.MTS')
+    video = Video_class('00000.MTS')
     # Single process
     '''if video.rank == 0:
         t_single = mpi.Wtime()
@@ -305,6 +321,7 @@ if __name__ == '__main__':
     frame_no, frame_time, frame_chi = video.parallel_moving_ave(work_array)
     video.aggrigate_to_root(frame_no, frame_time, frame_chi)
     video.comm.barrier()
+    video.save_result()
     t_multi -= mpi.Wtime()
     if video.rank == 0:
         # Save
