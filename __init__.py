@@ -188,6 +188,7 @@ class Video_class(object):
         print "About to start zipping..."
         with open(self.video_path + '.dat', 'a') as outfile:
             print "About to start zipping... I am rank ", self.rank
+            time.sleep(0.1*self.rank)
             zipped = zip(self.frame_no, self.frame_chi)
             np.savetxt(outfile, zipped)
         self.comm.Barrier()
