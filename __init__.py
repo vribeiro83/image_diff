@@ -35,31 +35,40 @@ class Video_class(object):
         self.width = int(self.cap.get(cv2.cv.CV_CAP_PROP_FRAME_WIDTH))
         self.height = int(self.cap.get(cv2.cv.CV_CAP_PROP_FRAME_HEIGHT))
 
-    def _get_inital_master(self, samples):
-        '''samples randomly from the video to get a inital master frame'''
+    def _get_inital_master(self, start, samples):
+        '''samples previous frames from the video to get a inital master frame
+        Start is the frame number to start, and samples is how many frames to
+        sample'''
         # Get empty frame
-        self.cap.set(cv2.cv.CV_CAP_PROP_POS_FRAMES, 0)
-        _, inital_frame = self.cap.read()
-        inital_frame = np.float32(inital_frame *0)
+        self.cap.set(cv2.cv.CV_CAP_PROP_POS_FRAMES, start)
+        sucess, inital_frame = self.cap.read()
+        while not sucess:
+            sucess, inital_frame = self.cap.read()
+        inital_frame = np.float32(inital_frame)
         # get random samples
-        sam_array = np.sort(np.random.randint(0, self.frames, samples))
+        sam_array = np.arange(start, start+samples)
         count = 0.
         for frame_no in sam_array:
-            self.cap.set(cv2.cv.CV_CAP_PROP_POS_FRAMES, frame_no)
+            #self.cap.set(cv2.cv.CV_CAP_PROP_POS_FRAMES, frame_no)
             # get frame
             sucess, frame = self.cap.read()
             if not sucess:
                 continue
+            cv2.accumulateWeighted(np.float32(frame), inital_frame, 0.020)
             count += 1
-            inital_frame += frame
-        inital_frame /= count
+
         return inital_frame
 
-    def parallel_moving_ave(self, frame_array):
+    def parallel_moving_ave(self, frame_array, n_sample=120):
         '''Does same as moving_ave_chi but in parrallel'''
         # Check for master image
         if not 'moving_ave_frame' in vars(self):
-            self.moving_ave_frame = self._get_inital_master(120)
+            # Check if at zero
+            if np.min(frame_array) - n_sample < 0:
+                start = 0
+            else:
+                start = np.min(frame_array) - n_sample
+            self.moving_ave_frame = self._get_inital_master(start, n_sample)
 
         self.frame_no = frame_array
         self.frame_chi = []
@@ -76,7 +85,11 @@ class Video_class(object):
                 continue
             self.frame_time.append(self.cap.get(cv2.cv.CV_CAP_PROP_POS_MSEC))
             # Cal chi
-            self.frame_chi.append(chisquare(frame, self.moving_ave_frame).sum()/ddof)
+            frame = np.float32(frame)
+            # add 1 so chi square can't be nan or inf
+            self.frame_chi.append(chisquare(frame+1,
+                                            self.moving_ave_frame+1).sum()
+                                                                     / ddof)              
             # Cal new ave frame
             cv2.accumulateWeighted(frame, self.moving_ave_frame, 0.020)
 
@@ -90,8 +103,8 @@ class Video_class(object):
         # set number of steps to skip
         stride = int(round(self.f_rate / float(fps)))
         # get inital aveage frame
-        self.moving_ave_frame = self._get_inital_master(120)
-        
+        self.moving_ave_frame = self._get_inital_master(0, 120)
+       
         # out puts
         self.frame_no = []
         self.frame_chi = []
@@ -123,76 +136,6 @@ class Video_class(object):
     def _msec2sec(self, msec):
         '''Converts mili-sec to sec'''
         return msec * 10**-3
-        
-    def make_master_im(self, max_frames=-1, step=-1):
-        '''makes master in memory'''
-        if max_frames < 1 and step < 1:
-            max_frames = self.frames
-            step = self.f_rate
-        elif max_frames < 1 and step >= 1:
-            max_frames = self.frames
-        elif max_frames >= 1 and step < 1:
-            step = self.local_i / (max_frames / self.size)
-
-        print step, max_frames
-
-        #print self.local_i, step, max_frames / self.size
-        #initalize master image
-        
-        _, self.master_image = self.cap.read()
-        sample = np.unravel_index(np.random.randint(0, len(self.master_image.ravel())),self.master_image.shape)
-        self.master_image = np.asarray(self.master_image, dtype=float)
-        #for image_no in xrange(1, max_frames):
-        for image_no in xrange(self.local_startframe, self.local_endframe, step):
-            self.cap.set(cv2.cv.CV_CAP_PROP_POS_FRAMES, image_no)
-            print image_no, step, self.local_startframe, self.local_endframe, self.frames
-            _, temp_image = self.cap.read()
-            out.append(temp_image)
-            temp_image = np.asarray(temp_image, dtype=float)
-            self.master_image += temp_image
-        self.master_image /= float(max_frames)
-        
-    
-    def image_chi(self, max_frames=-1, step=-1):
-        '''
-        Calculate chi squared on the images
-        '''
-        if max_frames < 1 and step < 1:
-            max_frames = self.frames
-            step = self.f_rate
-        elif max_frames < 1 and step >= 1:
-            max_frames = self.frames
-        elif max_frames >= 1 and step < 1:
-            step = self.local_i / (max_frames / self.size)
-        
-        self.frame_no = []
-        self.frame_chi = []
-        print "About to start doing Chi-squared"
-        x, y, z = self.master_image.shape
-        ddof = x*y
-        #for i_base in xrange(0, max_frames):
-        for i_base in xrange(self.local_startframe, self.local_endframe, step):
-            self.cap.set(cv2.cv.CV_CAP_PROP_POS_FRAMES, i_base)
-            print i_base, step, self.local_startframe, self.local_endframe, self.frames 
-            _, images = self.cap.read()
-            # Scale images so there are non nans or inf from chi squared test
-            chi = chisquare(np.float32(images)+1, self.master_image+1)
-            reduced = np.sum(chi) / ( ddof )
-            self.frame_no.append(float(i_base))
-            self.frame_chi.append(float(reduced))
-            
-        self.frame_no = np.asarray(self.frame_no)
-        self.frame_chi = np.asarray(self.frame_chi)
-        self.comm.Barrier()
-
-        print "About to start zipping..."
-        with open(self.video_path + '.dat', 'a') as outfile:
-            print "About to start zipping... I am rank ", self.rank
-            time.sleep(0.1*self.rank)
-            zipped = zip(self.frame_no, self.frame_chi)
-            np.savetxt(outfile, zipped)
-        self.comm.Barrier()
-    #THIS FILE OUTPUT WILL BE USED FOR POSTPROCESSING IF NEEDS BE
 
     def plot(self, individual=True):
         print "I am about to start drawing those amazing figures you really want to see!"
@@ -345,16 +288,16 @@ def chisquare(f_obs, f_exp, axis=0):
 
 
 if __name__ == '__main__':
-
+    import cPickle as pik
     # Test multiprocessing
     #frames = 10000
     video = Video_class('00016.MTS')
     # Single process
-    if video.rank == 0:
+    '''if video.rank == 0:
         t_single = mpi.Wtime()
         video.moving_ave_chi()
         t_single -= mpi.Wtime()
-        del video.moving_ave_frame
+        del video.moving_ave_frame'''
     video.comm.barrier()
     # Multiprocess
     t_multi = mpi.Wtime()
@@ -364,9 +307,8 @@ if __name__ == '__main__':
     video.comm.barrier()
     t_multi -= mpi.Wtime()
     if video.rank == 0:
-        print 'Single time is %2.0f and Multi time is %2.0f for speed up of %2.1f times'%(abs(t_single),abs(t_multi), t_multi/t_single)
-    #plt.hist(freq, 5)
-    #plt.show()
-    #video.image_chi()
-    video.plot()
-    #video.make_movie()
+        # Save
+        pik.dump((video.frame_no, video.frame_time, video.frame_chi),open('t','w'),2)
+        #print 'Single time is %2.0f and Multi time is %2.0f for speed up of %2.1f times'%(abs(t_single),abs(t_multi), t_multi/t_single)
+        video.plot()
+        #video.make_movie()
