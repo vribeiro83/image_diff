@@ -1,4 +1,4 @@
-from ../__init__ import Reduice_chi
+from __init__ import Reduice_chi
 import mpi4py.MPI as mpi
 import sys
 

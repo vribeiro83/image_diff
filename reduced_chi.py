@@ -25,7 +25,7 @@ class Reduice_chi(Video):
             # get frame
             sucess, frame = self.cap.read()
             if not sucess:
-                continue
+               continue
             cv2.accumulateWeighted(np.float32(frame), inital_frame, 0.020)
             count += 1
 

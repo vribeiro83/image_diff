@@ -3,6 +3,9 @@ import numpy as np
 import cv2
 import pylab as plt
 from matplotlib.patches import Rectangle
+import os
+import cPickle as pik
+from glob import glob
 #import ipdb
 
 
@@ -49,7 +52,7 @@ class Obj_dectect(Video):
             object_image = self.draw_box(frame)
             # identify keypoints
             self.get_keypoints(object_image)
-            #self.save_keypoints(path)
+            self.save_keypoints()
             
     def draw_box(self, frame):
         '''Draw box on image to get training object'''
@@ -64,14 +67,24 @@ class Obj_dectect(Video):
 
     def get_keypoints(self, image):
         '''Finds keypoints for object to find'''
-        surf = cv2.SURF(400)
+        surf = cv2.SURF(2000)
         self.kp, self.des = surf.detectAndCompute(image, None)
 
     def save_keypoints(self,path='key'):
         '''saves keypoints for later use'''
-
+        if not os.path.exists(path):
+            os.mkdir(path)
+        name = np.random.randint(9999)
+        #pik.dump((self.kp,self.des), open(os.path.join(path,'%i.pik'%name)),2)
+                 
     def load_keypoints(self, path='key'):
         '''loads keypoints'''
+        files = glob(path,'*.pik')
+        self.ks, self.des = [], []
+        for i in files:
+            ks, des = pik.load(open(i))
+            self.ks = ks
+            self.des = des
 
     def match_image(self, image, min_match=10):
         '''Detects object in image'''
@@ -81,7 +94,7 @@ class Obj_dectect(Video):
             index_params = dict(algorithm = FLANN_INDEX_KDTREE, trees = 5)
             search_params = dict(checks = 50)
             self.flann = cv2.FlannBasedMatcher(index_params, search_params)
-            self.surf = cv2.SURF(400)
+            self.surf = cv2.SURF(2000)
         # get descriports and keypoints
         kp_im, des_im = self.surf.detectAndCompute(image, None)
         matches = self.flann.knnMatch(self.des ,des_im, k=2)
@@ -114,9 +127,13 @@ class Obj_dectect(Video):
             self.frame_no.append(frame_no)
             self.frame_time.append(self.cap.get(cv2.cv.CV_CAP_PROP_POS_MSEC))
             self.frame_chi.append(self.match_image(frame))
+            print self.frame_chi[-1],self._msec2min(self.frame_time[-1])
             if plot:
                 # only plot if sucessfull
-                cv2.imshow('Got One',frame)
+                if self.frame_chi[-1] > 10:
+                    cv2.imshow('Got One',frame)
+                else:
+                    print 'Fail at %f'%frame_no
 
 class Draw_rec(object):
     def __init__(self):

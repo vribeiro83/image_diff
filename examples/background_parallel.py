@@ -1,4 +1,4 @@
-from ../__init__ import Background_detct
+from __init__ import Background_detct
 import mpi4py.MPI as mpi
 import sys
 
