@@ -135,6 +135,23 @@ class Obj_dectect(Video):
                 else:
                     print 'Fail at %f'%frame_no
 
+    def play_find(self, start_time=0, cascade_file='hornbil.xml'):
+        '''uses cacade to find objects at the same time'''
+        self.cap.set(cv2.cv.CV_CAP_PROP_POS_MSEC, start_time*10**3)
+        hornbil = cv2.CascadeClassifier(cascade_file)
+        for frame_no in range(1, self.frames):
+            sucess, frame = self.cap.read()
+            if not sucess:
+                continue
+            # check if there is a hornbil
+            gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+            birds = hornbil.detectMultiScale(gray, 1.02, 5)
+            print self.cap.get(cv2.cv.CV_CAP_PROP_POS_MSEC)/(10**3)
+            for (x,y,w,h) in birds:
+                cv2.rectangle(frame, (x,y), (x+w,y+h),(255,0,0),2)
+            cv2.imshow('frame', frame)
+            cv2.waitKey(33)
+
 class Draw_rec(object):
     def __init__(self):
         self.ax = plt.gca()
