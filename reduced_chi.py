@@ -1,37 +1,41 @@
 from base import Video
 import numpy as np
 import cv2
-#import ipdb
+import ipdb
 
 
-class Reduice_chi(Video):
+class Reduced_chi(Video):
 
 
-    def _get_inital_master(self, start, samples):
-        '''samples previous frames from the video to get a inital master frame
-        Start is the frame number to start, and samples is how many frames to
-        sample'''
+    def _get_initial_master(self, start, samples, alpha=0.02):
+        '''
+        Samples previous frames from the video to get an inital master frame
+        
+        start = frame number to start at
+        samples = how many frames to sample
+        alpha = regulates the weighting of the images
+        
+        '''
         # Get empty frame
         self.cap.set(cv2.cv.CV_CAP_PROP_POS_FRAMES, start)
-        sucess, inital_frame = self.cap.read()
+        sucess, initial_frame = self.cap.read()
         while not sucess:
-            sucess, inital_frame = self.cap.read()
-        inital_frame = np.float32(inital_frame)
-        # get random samples
+            sucess, initial_frame = self.cap.read()
+        initial_frame = np.float32(initial_frame)
+        # Generate value within start and start+samples
         sam_array = np.arange(start, start+samples)
         count = 0.
         for frame_no in sam_array:
-            #self.cap.set(cv2.cv.CV_CAP_PROP_POS_FRAMES, frame_no)
             # get frame
             sucess, frame = self.cap.read()
             if not sucess:
                continue
-            cv2.accumulateWeighted(np.float32(frame), inital_frame, 0.020)
+            cv2.accumulateWeighted(np.float32(frame), initial_frame, alpha)
             count += 1
 
-        return inital_frame
+        return initial_frame
 
-    def parallel_moving_ave(self, frame_array, n_sample=120):
+    def parallel_moving_ave(self, frame_array, n_sample=120, alpha=0.02):
         '''Does same as moving_ave_chi but in parrallel'''
         # Check for master image
         if not 'moving_ave_frame' in vars(self):
@@ -40,9 +44,9 @@ class Reduice_chi(Video):
                 start = 0
             else:
                 start = np.min(frame_array) - n_sample
-            self.moving_ave_frame = self._get_inital_master(start, n_sample)
+            self.moving_ave_frame = self._get_initial_master(start, n_sample)
+            self.frame_no = frame_array
 
-        self.frame_no = frame_array
         self.frame_chi = []
         self.frame_time = []
         # start chi square
@@ -62,20 +66,23 @@ class Reduice_chi(Video):
             self.frame_chi.append(chisquare(frame+1,
                                             self.moving_ave_frame+1).sum()
                                                                      / ddof)              
-            # Cal new ave frame
-            cv2.accumulateWeighted(frame, self.moving_ave_frame, 0.020)
+            # Calculate new average frame
+            cv2.accumulateWeighted(frame, self.moving_ave_frame, alpha)
 
         return self.frame_no, self.frame_time, self.frame_chi
         
     
-    def moving_ave_chi(self, max_frames=-1, fps=1, plot=False):
-        '''Uses moving average for master frame and calculates fps frames per second'''
+    def moving_ave_chi(self, max_frames=-1, fps=1, alpha=0.02, plot=False):
+        '''
+        Uses moving average for master frame
+        Calculates fps (frames per second)
+        '''
         if max_frames < 1:
             max_frames = self.frames
         # set number of steps to skip
         stride = int(round(self.f_rate / float(fps)))
-        # get inital aveage frame
-        self.moving_ave_frame = self._get_inital_master(0, 120)
+        # get initial aveage frame
+        self.moving_ave_frame = self._get_initial_master(0, 120)
        
         # out puts
         self.frame_no = []
@@ -95,7 +102,7 @@ class Reduice_chi(Video):
             # Cal chi
             self.frame_chi.append(chisquare(frame, self.moving_ave_frame).sum()/ddof)
             # Cal new ave frame
-            cv2.accumulateWeighted(frame, self.moving_ave_frame, 0.020)
+            cv2.accumulateWeighted(frame, self.moving_ave_frame, alpha)
             # Show moving Ave Frame and chi plot
             if plot:
                 cv2.imshow('Ave Frame',self.moving_ave_frame)

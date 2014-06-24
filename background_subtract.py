@@ -4,7 +4,7 @@ import numpy as np
 import ipdb
 
 
-class Background_detct(Video):
+class Background_detect(Video):
 
     def detect_movment(self, max_frames=-1, fps=1, plot=False):
         '''Does background modeling to find movment in movie'''

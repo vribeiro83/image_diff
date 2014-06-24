@@ -7,6 +7,7 @@ import pylab as plt
 from matplotlib.ticker import MultipleLocator, FormatStrFormatter
 import datetime as dt
 import os
+import datetime
 
 class Video(object):
     
@@ -91,21 +92,37 @@ class Video(object):
             self.comm.send((frame_no, frame_time, frame_chi), dest=0)
             
     def save_result(self, filename=None):
-        '''Saves results to a .csv file  with 3 colmns [frame_num,frame_time
-        frame_chi].
-        If no files name given with be video_name.csv'''
+        '''
+        
+        Saves results to a .csv file  with 4 columns
+        [actual_time, frame_num, frame_time (sec), frame_chi].
+        
+        If no files name given with be video_name.csv
+        
+        '''
         if filename is None:
             outfile = os.path.splitext(self.video_path)[0] + '.csv'
         else:
             outfile = os.path.splitext(filename)[0] + '.csv'
 
         if not hasattr(self, 'frame_no'):
-            raise AttributeError('Must get reduiced chi squared first')
-        ####Not working
+            raise AttributeError('Must get reduced chi squared first')
+
+        # Sort array
+        self.frame_no.sort()
+
+        '''
+        # Retrieve time stamps
+        self.time = os.system("exiftool " + self.video_path + " | grep Date/Time\ Original | awk '{split($0,a,\" \"); print a[5]}' | awk '{split($0,a,\"+\"); print a[1]'")
+        self.time_diff = os.system("exiftool " + self.video_path + " | grep Date/Time\ Original | awk '{split($0,a,\" \"); print a[5]}' | awk '{split($0,a,\"+\"); print a[2]}'")
+        #self.time = datetime.datetime.strptime(str(self.time), "%h:%m:%s")
+        #self.time_diff = datetime.datetime.strptime(str(self.time_diff), "%h:%m")
+        print self.time, self.time_diff, self.time+self.time_diff
+        '''
         out_array = np.vstack((self.frame_no, self.frame_time,
                                self.frame_chi)).T
         np.savetxt(outfile, out_array, delimiter=',',
-                   header='frame_number, frame_time, frame_chi')
+                   header='frame_number, frame_time (sec), reduced_chisquared')
         
     def plot(self, show=True):
         print "I am about to start drawing those amazing figures you really want to see!"
