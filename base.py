@@ -5,9 +5,10 @@ import numpy as np
 import cv2
 import pylab as plt
 from matplotlib.ticker import MultipleLocator, FormatStrFormatter
-import datetime as dt
 import os
 import datetime
+import time
+import subprocess
 
 class Video(object):
     
@@ -45,6 +46,12 @@ class Video(object):
         self.cap.release()
         cv2.destroyAllWindows()
         out.release()
+
+    def to_hhmmss(self, sec):
+        min,sec = divmod(sec,60)
+        hr,min = divmod(min,60)
+        print "%d:%02d:%02d" % (hr,min,sec)
+        return "%d:%02d:%02d" % (hr,min,sec)
 
     def play(self, start_frame=0):
         '''Plays video using opencv2'''
@@ -91,6 +98,41 @@ class Video(object):
         else:
             self.comm.send((frame_no, frame_time, frame_chi), dest=0)
             
+    def camera(self, hr, min, sec):
+        # Retrieve time stamps
+        self.camera_time = subprocess.Popen("exiftool " + self.video_path + " | grep Date/Time\ Original | awk '{split($0,a,\" \"); print a[5]}' | awk '{split($0,a,\"+\"); print a[1]}'", shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        self.camera_gmt = subprocess.Popen("exiftool " + self.video_path + " | grep Date/Time\ Original | awk '{split($0,a,\" \"); print a[5]}' | awk '{split($0,a,\"+\"); print a[2]}'", shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+
+        self.camera_time.stderr.read()#reads error output
+        self.camera_time = self.camera_time.stdout.read()
+        self.camera_gmt.stderr.read()#reads error output
+        self.camera_gmt = self.camera_gmt.stdout.read()
+
+        try:
+            self.camera_time = time.strptime(self.camera_time, "%H:%M:%S")
+        except ValueError, v:
+            if len(v.args) > 0 and v.args[0].startswith('unconverted data remains: '):
+                self.camera_time = self.camera_time[:-(len(v.args[0])-26)]
+                self.camera_time = time.strptime(self.camera_time, "%H:%M:%S")
+
+        try:
+            self.camera_gmt = time.strptime(self.camera_gmt, "%H:%M")
+        except ValueError, v:
+            if len(v.args) > 0 and v.args[0].startswith('unconverted data remains: '):
+                self.camera_gmt = self.camera_gmt[:-(len(v.args[0])-26)]
+                self.camera_gmt = time.strptime(self.camera_gmt, "%H:%M")
+
+
+
+        '''
+        self.day_time = []
+        for i_base in xrange(0,len(self.frame_time), self.size):
+            i = i_base + self.rank
+            if i < len(self.frame_time):
+                self.day_time = datetime.timedelta(seconds=self.frame_time[i])
+                '''
+        print self.day_time
+
     def save_result(self, filename=None):
         '''
         
@@ -111,18 +153,10 @@ class Video(object):
         # Sort array
         self.frame_no.sort()
 
-        '''
-        # Retrieve time stamps
-        self.time = os.system("exiftool " + self.video_path + " | grep Date/Time\ Original | awk '{split($0,a,\" \"); print a[5]}' | awk '{split($0,a,\"+\"); print a[1]'")
-        self.time_diff = os.system("exiftool " + self.video_path + " | grep Date/Time\ Original | awk '{split($0,a,\" \"); print a[5]}' | awk '{split($0,a,\"+\"); print a[2]}'")
-        #self.time = datetime.datetime.strptime(str(self.time), "%h:%m:%s")
-        #self.time_diff = datetime.datetime.strptime(str(self.time_diff), "%h:%m")
-        print self.time, self.time_diff, self.time+self.time_diff
-        '''
         out_array = np.vstack((self.frame_no, self.frame_time,
                                self.frame_chi)).T
         np.savetxt(outfile, out_array, delimiter=',',
-                   header='frame_number, frame_time (sec), reduced_chisquared')
+                   header='day_time (HH:MM:SS), frame_number, frame_time (sec), reduced_chisquared')
         
     def plot(self, show=True):
         print "I am about to start drawing those amazing figures you really want to see!"
