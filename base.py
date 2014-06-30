@@ -2,6 +2,7 @@
 
 import mpi4py.MPI as mpi
 import numpy as np
+import pandas as pd
 import cv2
 import pylab as plt
 from matplotlib.ticker import MultipleLocator, FormatStrFormatter
@@ -40,6 +41,19 @@ class Video(object):
     def _min2msec(self, min):
         '''Converts minues to millisec'''
         return min/1.6666666666666667e-05
+
+    def _time2datetime(self, t):
+        '''Turns frame time into datetime (HH:MM:SS YYYY:MM:DD) from video
+        header. Assumes t is in microseconds from camera_time'''
+        if not hasattr(self, 'camera_time'):
+            self.get_camera_time()
+        if isinstance(t, (list, np.ndarray)):
+            out = [self.camera_time + datetime.timedelta(microseconds=i)
+                   for i in t]
+        else:
+            out = self.camera_time + datetime.timedelta(microseconds(t))
+        return out
+                
     
     def finialize(self):
         '''Closes everything'''
@@ -47,11 +61,7 @@ class Video(object):
         cv2.destroyAllWindows()
         out.release()
 
-    def to_hhmmss(self, sec):
-        min,sec = divmod(sec,60)
-        hr,min = divmod(min,60)
-        print "%d:%02d:%02d" % (hr,min,sec)
-        return "%d:%02d:%02d" % (hr,min,sec)
+
 
     def play(self, start_frame=0):
         '''Plays video using opencv2'''
@@ -98,40 +108,21 @@ class Video(object):
         else:
             self.comm.send((frame_no, frame_time, frame_chi), dest=0)
             
-    def camera(self, hr, min, sec):
+    def get_camera_time(self, tmzone='02:00'):
         # Retrieve time stamps
-        self.camera_time = subprocess.Popen("exiftool " + self.video_path + " | grep Date/Time\ Original | awk '{split($0,a,\" \"); print a[5]}' | awk '{split($0,a,\"+\"); print a[1]}'", shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-        self.camera_gmt = subprocess.Popen("exiftool " + self.video_path + " | grep Date/Time\ Original | awk '{split($0,a,\" \"); print a[5]}' | awk '{split($0,a,\"+\"); print a[2]}'", shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        camera_time = subprocess.Popen("exiftool " + self.video_path +
+                                        " | grep Date/Time\ Original",
+                shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        error = camera_time.stderr.read()
+        if len(error):
+            # Problem with reading
+            raise OSError(error)
+        unproc_str = camera_time.stdout.read()
+        unproc_str = unproc_str[unproc_str.find(':')+1:]
+        # get date, time and time zone
+        self.camera_time = datetime.datetime.strptime(unproc_str,
+                                        ' %Y:%m:%d %H:%M:%S+'+tmzone+'\n')
 
-        self.camera_time.stderr.read()#reads error output
-        self.camera_time = self.camera_time.stdout.read()
-        self.camera_gmt.stderr.read()#reads error output
-        self.camera_gmt = self.camera_gmt.stdout.read()
-
-        try:
-            self.camera_time = time.strptime(self.camera_time, "%H:%M:%S")
-        except ValueError, v:
-            if len(v.args) > 0 and v.args[0].startswith('unconverted data remains: '):
-                self.camera_time = self.camera_time[:-(len(v.args[0])-26)]
-                self.camera_time = time.strptime(self.camera_time, "%H:%M:%S")
-
-        try:
-            self.camera_gmt = time.strptime(self.camera_gmt, "%H:%M")
-        except ValueError, v:
-            if len(v.args) > 0 and v.args[0].startswith('unconverted data remains: '):
-                self.camera_gmt = self.camera_gmt[:-(len(v.args[0])-26)]
-                self.camera_gmt = time.strptime(self.camera_gmt, "%H:%M")
-
-
-
-        '''
-        self.day_time = []
-        for i_base in xrange(0,len(self.frame_time), self.size):
-            i = i_base + self.rank
-            if i < len(self.frame_time):
-                self.day_time = datetime.timedelta(seconds=self.frame_time[i])
-                '''
-        print self.day_time
 
     def save_result(self, filename=None):
         '''
@@ -151,12 +142,26 @@ class Video(object):
             raise AttributeError('Must get reduced chi squared first')
 
         # Sort array
-        self.frame_no.sort()
-
-        out_array = np.vstack((self.frame_no, self.frame_time,
+        argsort = np.argsort(self.frame_no)
+        self.frame_no = np.sort(self.frame_no)
+        self.frame_time = np.asarray(self.frame_time)[argsort]
+        self.frame_chi = np.asarray(self.frame_chi)[argsort]
+        # Create datetime array
+        self.frame_datetime = np.asarray(self._time2datetime(self.frame_time))
+        #save as a dataframe since they can have multiple types
+        out_data = np.vstack((self.frame_no, self.frame_time,
                                self.frame_chi)).T
-        np.savetxt(outfile, out_array, delimiter=',',
-                   header='day_time (HH:MM:SS), frame_number, frame_time (sec), reduced_chisquared')
+        # rm nan and inf values
+        out_data = out_data[np.isfinite(out_data[:,2])]
+        self.frame_no = out_data[np.isfinite(out_data[:,2]), 0]
+        self.frame_time = out_data[np.isfinite(out_data[:,2]),1]
+        self.frame_chi =out_data[np.isfinite(out_data[:,2]),2]
+        self.frame_datetime = self.frame_datetime[np.isfinite(out_data[:,2])]
+        # get DataFrame ready
+        temp = pd.DataFrame(data=out_data, index= self.frame_datetime,
+                             columns=['Date time' 'frame_number',
+                                    'frame_time (msec)','reduced_chisquared'])
+        temp.to_csv(outfile)
         
     def plot(self, show=True):
         print "I am about to start drawing those amazing figures you really want to see!"
@@ -211,11 +216,12 @@ class Video(object):
 
         # Define the codec and create VideoWriter object
         #fourcc = cv2.cv.CV_FOURCC(*'XVID')
-        fourcc = cv2.cv.CV_FOURCC('D','I','V','X')
+        #fourcc = cv2.cv.CV_FOURCC('D','I','V','X')
         #fourcc = cv2.cv.CV_FOURCC('M','P','V','4')
         #fourcc = cv2.cv.CV_FOURCC('M','P','E','G')
+        fourcc = cv2.cv.CV_FOURCC('L','M','P','4')
         out = cv2.VideoWriter(self.video_path + '.avi',
-                              fourcc, 50, (self.width,self.height))
+                              fourcc, self.f_rate, (self.width/2,self.height/2))
         print "Making a movie, I am rank: ", self.rank
         for i_base in range(0, len(self.frame_no)-1, self.size):
             i = i_base + self.rank
@@ -243,7 +249,7 @@ class Video(object):
         TO CREATE MOVIE
         http://opencv-python-tutroals.readthedocs.org/en/latest/py_tutorials/py_gui/py_video_display/py_video_display.html
         '''
-
+        
         # Define the codec and create VideoWriter object
         #fourcc = cv2.cv.CV_FOURCC(*'XVID')
         fourcc = cv2.cv.CV_FOURCC('D','I','V','X')
