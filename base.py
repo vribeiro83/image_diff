@@ -159,7 +159,7 @@ class Video(object):
         self.frame_datetime = self.frame_datetime[np.isfinite(out_data[:,2])]
         # get DataFrame ready
         temp = pd.DataFrame(data=out_data, index= self.frame_datetime,
-                             columns=['Date time' 'frame_number',
+                             columns=['Date time' ,'frame_number',
                                     'frame_time (msec)','reduced_chisquared'])
         temp.to_csv(outfile)
         
@@ -213,13 +213,13 @@ class Video(object):
         TO CREATE MOVIE
         http://opencv-python-tutroals.readthedocs.org/en/latest/py_tutorials/py_gui/py_video_display/py_video_display.html
         '''
-
         # Define the codec and create VideoWriter object
         #fourcc = cv2.cv.CV_FOURCC(*'XVID')
         #fourcc = cv2.cv.CV_FOURCC('D','I','V','X')
         #fourcc = cv2.cv.CV_FOURCC('M','P','V','4')
         #fourcc = cv2.cv.CV_FOURCC('M','P','E','G')
         fourcc = cv2.cv.CV_FOURCC('L','M','P','4')
+        
         out = cv2.VideoWriter(self.video_path + '.avi',
                               fourcc, self.f_rate, (self.width/2,self.height/2))
         print "Making a movie, I am rank: ", self.rank
@@ -252,10 +252,13 @@ class Video(object):
         
         # Define the codec and create VideoWriter object
         #fourcc = cv2.cv.CV_FOURCC(*'XVID')
-        fourcc = cv2.cv.CV_FOURCC('D','I','V','X')
+        #fourcc = cv2.cv.CV_FOURCC('D','I','V','X')
         #fourcc = cv2.cv.CV_FOURCC('M','P','V','4')
         #fourcc = cv2.cv.CV_FOURCC('M','P','E','G')
-        out = cv2.VideoWriter(self.video_path + '.avi',fourcc, 50, (self.width,self.height))
+        fourcc = cv2.cv.CV_FOURCC('L','M','P','4')
+        out = cv2.VideoWriter(self.video_path + '.avi',fourcc,
+                              self.f_rate,
+                              (self.width,self.height))
         print "Making a movie, I am rank: ", self.rank
         for i in range(len(self.frame_no)):
             if i < len(self.frame_no):
@@ -277,3 +280,48 @@ class Video(object):
                         success, frame = self.cap.read()
                         out.write(frame)
                         
+def Sigmaclip(array, low=4., high=4, axis=None):
+    '''(ndarray, int, int, int) -> ndarray
+
+    Iterative sigma-clipping of along the given axis.
+	   
+    The output array contains only those elements of the input array `c`
+    that satisfy the conditions ::
+	   
+    mean(c) - std(c)*low < c < mean(c) + std(c)*high
+	
+    Parameters
+    ----------
+    a : array_like
+    data array
+    low : float
+    lower bound factor of sigma clipping
+    high : float
+    upper bound factor of sigma clipping
+    
+    Returns
+    -------
+    c : array
+    sigma clipped mean along axis
+    '''
+    c = np.asarray(array)
+    if axis is None or c.ndim == 1:
+        from scipy.stats import sigmaclip
+        return np.mean(sigmaclip(c)[0])
+    #create masked array
+    c_mask = np.ma.masked_array(c, np.isnan(c))
+    delta = 1
+    while delta:
+           c_std = c_mask.std(axis=axis)
+           c_mean = c_mask.mean(axis=axis)
+           size = c_mask.mask.sum()
+           critlower = c_mean - c_std*low
+           critupper = c_mean + c_std*high
+           indexer = [slice(None)] * c.ndim
+           for i in xrange(c.shape[axis]):
+               indexer[axis] = slice(i,i+1)
+               c_mask[indexer].mask = np.logical_and(
+                   c_mask[indexer].squeeze() > critlower, 
+                   c_mask[indexer].squeeze() < critupper) == False
+           delta = size - c_mask.mask.sum()
+    return c_mask.mean(axis).data
