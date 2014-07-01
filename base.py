@@ -43,15 +43,17 @@ class Video(object):
         return min/1.6666666666666667e-05
 
     def _time2datetime(self, t):
-        '''Turns frame time into datetime (HH:MM:SS YYYY:MM:DD) from video
-        header. Assumes t is in microseconds from camera_time'''
+        '''
+        Turns frame time into datetime (YYYY:MM:DD HH:MM:SS) from video
+        header. Assumes t is in milliseconds from camera_time
+        '''
         if not hasattr(self, 'camera_time'):
             self.get_camera_time()
         if isinstance(t, (list, np.ndarray)):
-            out = [self.camera_time + datetime.timedelta(microseconds=i)
+            out = [self.camera_time + datetime.timedelta(milliseconds=i)
                    for i in t]
         else:
-            out = self.camera_time + datetime.timedelta(microseconds(t))
+            out = self.camera_time + datetime.timedelta(milliseconds(t))
         return out
                 
     
@@ -107,7 +109,7 @@ class Video(object):
 
         else:
             self.comm.send((frame_no, frame_time, frame_chi), dest=0)
-            
+
     def get_camera_time(self, tmzone='02:00'):
         # Retrieve time stamps
         camera_time = subprocess.Popen("exiftool " + self.video_path +
@@ -127,8 +129,8 @@ class Video(object):
     def save_result(self, filename=None):
         '''
         
-        Saves results to a .csv file  with 4 columns
-        [actual_time, frame_num, frame_time (sec), frame_chi].
+        Saves results to a .csv file  with 5 columns
+        [Date, actual_time, frame_num, frame_time (sec), reduced chisquared].
         
         If no files name given with be video_name.csv
         
@@ -155,13 +157,17 @@ class Video(object):
         out_data = out_data[np.isfinite(out_data[:,2])]
         self.frame_no = out_data[np.isfinite(out_data[:,2]), 0]
         self.frame_time = out_data[np.isfinite(out_data[:,2]),1]
-        self.frame_chi =out_data[np.isfinite(out_data[:,2]),2]
+        self.frame_chi = out_data[np.isfinite(out_data[:,2]),2]
         self.frame_datetime = self.frame_datetime[np.isfinite(out_data[:,2])]
         # get DataFrame ready
         temp = pd.DataFrame(data=out_data, index= self.frame_datetime,
+<<<<<<< HEAD
                              columns=['Date time' ,'frame_number',
+=======
+                             columns=['Date time, frame_number',
+>>>>>>> 201dc0e77879f65ab83732ac51f77883a7e32200
                                     'frame_time (msec)','reduced_chisquared'])
-        temp.to_csv(outfile)
+        temp.to_csv(outfile, sep="\t")
         
     def plot(self, show=True):
         print "I am about to start drawing those amazing figures you really want to see!"
