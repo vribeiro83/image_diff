@@ -162,11 +162,6 @@ class Video(object):
         # get DataFrame ready
         temp = pd.DataFrame(data=out_data, index= self.frame_datetime,
                              columns=['Date time, frame_number',
-<<<<<<< HEAD
-                             columns=['Date time' ,'frame_number',
-=======
-                             columns=['Date time, frame_number',
->>>>>>> 201dc0e77879f65ab83732ac51f77883a7e32200
                                     'frame_time (msec)','reduced_chisquared'])
         temp.to_csv(outfile, sep="\t")
         
