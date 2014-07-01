@@ -161,6 +161,7 @@ class Video(object):
         self.frame_datetime = self.frame_datetime[np.isfinite(out_data[:,2])]
         # get DataFrame ready
         temp = pd.DataFrame(data=out_data, index= self.frame_datetime,
+                             columns=['Date time, frame_number',
 <<<<<<< HEAD
                              columns=['Date time' ,'frame_number',
 =======
@@ -219,13 +220,13 @@ class Video(object):
         TO CREATE MOVIE
         http://opencv-python-tutroals.readthedocs.org/en/latest/py_tutorials/py_gui/py_video_display/py_video_display.html
         '''
+
         # Define the codec and create VideoWriter object
         #fourcc = cv2.cv.CV_FOURCC(*'XVID')
         #fourcc = cv2.cv.CV_FOURCC('D','I','V','X')
         #fourcc = cv2.cv.CV_FOURCC('M','P','V','4')
         #fourcc = cv2.cv.CV_FOURCC('M','P','E','G')
         fourcc = cv2.cv.CV_FOURCC('L','M','P','4')
-        
         out = cv2.VideoWriter(self.video_path + '.avi',
                               fourcc, self.f_rate, (self.width/2,self.height/2))
         print "Making a movie, I am rank: ", self.rank
@@ -258,13 +259,10 @@ class Video(object):
         
         # Define the codec and create VideoWriter object
         #fourcc = cv2.cv.CV_FOURCC(*'XVID')
-        #fourcc = cv2.cv.CV_FOURCC('D','I','V','X')
+        fourcc = cv2.cv.CV_FOURCC('D','I','V','X')
         #fourcc = cv2.cv.CV_FOURCC('M','P','V','4')
         #fourcc = cv2.cv.CV_FOURCC('M','P','E','G')
-        fourcc = cv2.cv.CV_FOURCC('L','M','P','4')
-        out = cv2.VideoWriter(self.video_path + '.avi',fourcc,
-                              self.f_rate,
-                              (self.width,self.height))
+        out = cv2.VideoWriter(self.video_path + '.avi',fourcc, 50, (self.width,self.height))
         print "Making a movie, I am rank: ", self.rank
         for i in range(len(self.frame_no)):
             if i < len(self.frame_no):
