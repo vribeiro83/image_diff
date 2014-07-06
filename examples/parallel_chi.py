@@ -11,9 +11,10 @@ work_array = video.mpi_work_split()
 frame_no, frame_time, frame_chi = video.parallel_moving_ave(work_array)
 video.aggrigate_to_root(frame_no, frame_time, frame_chi)
 video.comm.barrier()
-video.save_result()
+
 t_multi -= mpi.Wtime()
 if video.rank == 0:
     # Make plot
+    video.save_result()
     video.plot(show=False)
-    #video.make_movie()
+    video.make_movie()
