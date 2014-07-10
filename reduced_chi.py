@@ -45,8 +45,8 @@ class Reduced_chi(Video):
             else:
                 start = np.min(frame_array) - n_sample
             self.moving_ave_frame = self._get_initial_master(start, n_sample)
-            self.frame_no = frame_array
-
+            
+        self.frame_no = []
         self.frame_chi = []
         self.frame_time = []
         # start chi square
@@ -57,11 +57,12 @@ class Reduced_chi(Video):
             success, frame = self.cap.read()
             if not success:
                 # remove frame_no
-                self.frame_no.pop(self.frame_no.index(frame_no))
+                #self.frame_no.pop(self.frame_no.index(frame_no))
                 continue
             self.frame_time.append(self.cap.get(cv2.cv.CV_CAP_PROP_POS_MSEC))
             # Cal chi
             frame = np.float32(frame)
+            self.frame_no.append(frame_no)
             # add 1 so chi square can't be nan or inf
             self.frame_chi.append(chisquare(frame+1,
                                             self.moving_ave_frame+1).sum()
