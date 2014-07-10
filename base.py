@@ -111,6 +111,10 @@ class Video(object):
             self.comm.send((frame_no, frame_time, frame_chi), dest=0)
 
     def get_camera_time(self, tmzone='02:00'):
+        '''
+        Retrieve camera information using exiftool on command line
+        This does not yet retrieve timezone need some working
+        '''
         # Retrieve time stamps
         camera_time = subprocess.Popen("exiftool " + self.video_path +
                                         " | grep Date/Time\ Original",
@@ -121,9 +125,11 @@ class Video(object):
             raise OSError(error)
         unproc_str = camera_time.stdout.read()
         unproc_str = unproc_str[unproc_str.find(':')+1:]
+        unproc_str = unproc_str[:-7]
         # get date, time and time zone
+        # this does not actually get the time zone
         self.camera_time = datetime.datetime.strptime(unproc_str,
-                                        ' %Y:%m:%d %H:%M:%S+'+tmzone+'\n')
+                                        ' %Y:%m:%d %H:%M:%S')
 
 
     def save_result(self, filename=None):
