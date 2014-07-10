@@ -171,7 +171,7 @@ class Video(object):
                                     'frame_time (msec)','reduced_chisquared'])
         temp.to_csv(outfile, sep="\t")
         
-    def plot(self, show=True):
+    def plot(self, filename=None, show=True):
         print "I am about to start drawing those amazing figures you really want to see!"
         majorLocator   = MultipleLocator(5)
         majorFormatter = FormatStrFormatter('%d')
@@ -212,7 +212,10 @@ class Video(object):
 
  
         plt.plot(self._msec2min(frameTime), redChi, 'k-')
-        plt.savefig(self.video_path + ".jpg", dpi=self.dpi)
+        if filename is None:
+            plt.savefig(self.video_path + ".jpg", dpi=self.dpi)
+        else:
+            plt.savefig(filename + ".jpg", dpi=self.dpi)
         if show:
             plt.show()
        
