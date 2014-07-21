@@ -3,6 +3,7 @@
 import mpi4py.MPI as mpi
 import numpy as np
 import pandas as pd
+from scipy.stats import norm
 import cv2
 import pylab as plt
 from matplotlib.ticker import MultipleLocator, FormatStrFormatter
@@ -167,8 +168,8 @@ class Video(object):
         self.frame_datetime = self.frame_datetime[np.isfinite(out_data[:,2])]
         # get DataFrame ready
         temp = pd.DataFrame(data=out_data, index= self.frame_datetime,
-                             columns=['Date time, frame_number',
-                                    'frame_time (msec)','reduced_chisquared'])
+                             columns=['Date_time', 'frame_number',
+                                    'frame_time_(msec)','reduced_chisquared'])
         temp.to_csv(outfile, sep="\t")
         
     def plot(self, filename=None, show=True):
@@ -232,7 +233,7 @@ class Video(object):
         #fourcc = cv2.cv.CV_FOURCC('M','P','E','G')
         fourcc = cv2.cv.CV_FOURCC('L','M','P','4')
         out = cv2.VideoWriter(self.video_path + '.avi',
-                              fourcc, self.f_rate, (self.width/2,self.height/2))
+                              fourcc, self.f_rate, (self.width/4,self.height/4))
         print "Making a movie, I am rank: ", self.rank
         for i_base in range(0, len(self.frame_no)-1, self.size):
             i = i_base + self.rank
@@ -255,7 +256,7 @@ class Video(object):
                         success, frame = self.cap.read()
                         out.write(frame)
 
-    def make_movie(self):
+    def make_movie(self, movie_obj):
         '''
         TO CREATE MOVIE
         http://opencv-python-tutroals.readthedocs.org/en/latest/py_tutorials/py_gui/py_video_display/py_video_display.html
@@ -263,10 +264,12 @@ class Video(object):
         
         # Define the codec and create VideoWriter object
         #fourcc = cv2.cv.CV_FOURCC(*'XVID')
-        fourcc = cv2.cv.CV_FOURCC('D','I','V','X')
+        #fourcc = cv2.cv.CV_FOURCC('D','I','V','X')
         #fourcc = cv2.cv.CV_FOURCC('M','P','V','4')
         #fourcc = cv2.cv.CV_FOURCC('M','P','E','G')
-        out = cv2.VideoWriter(self.video_path + '.avi',fourcc, 50, (self.width,self.height))
+        fourcc = cv2.cv.CV_FOURCC('X', '2', '6', '4')
+        out = cv2.VideoWriter(self.video_path + '.mp4',fourcc, self.fps,
+                              (self.width/4,self.height/4))
         print "Making a movie, I am rank: ", self.rank
         for i in range(len(self.frame_no)):
             if i < len(self.frame_no):
@@ -315,7 +318,8 @@ def Sigmaclip(array, low=4., high=4, axis=None):
     c = np.asarray(array)
     if axis is None or c.ndim == 1:
         from scipy.stats import sigmaclip
-        return np.mean(sigmaclip(c)[0])
+        out = sigmaclip(c)[0]
+        return out.mean(), out.std()
     #create masked array
     c_mask = np.ma.masked_array(c, np.isnan(c))
     delta = 1
@@ -332,4 +336,56 @@ def Sigmaclip(array, low=4., high=4, axis=None):
                    c_mask[indexer].squeeze() > critlower, 
                    c_mask[indexer].squeeze() < critupper) == False
            delta = size - c_mask.mask.sum()
-    return c_mask.mean(axis).data
+    return c_mask.mean(axis).data, c_mask.std(axis).data
+
+def find_changepoints(y, zmax=20):
+    '''Finds changepoints in data with hmm and viterbi algo.
+    Estimates the transmission and emission probs from data'''
+    y = np.asarray(y)
+    # estimate transmission pdf as exp with boot straping?
+    randomsample = np.random.choice(y, size=len(y)*20)
+    pdf_y,pdf_x = np.histogram(np.abs(np.diff(randomsample)), 400, normed=True)
+    pdf_y[pdf_y == 0] = 1e-99
+    pdf_x = pdf_x[:-1]
+    trans_p = General_PDF(pdf_x, pdf_y)
+    # Get emmission probs by sigma clipping data
+    emiss_mean, emiss_std = Sigmaclip(y)
+    states = np.unique(y)
+    
+class General_PDF(object):
+    def __init__(self, x, y):
+        self.x = x
+        # renormalize
+        self.y = y/y.sum()
+    def __call__(self, state1, state2):
+        '''Calulates the prob of abs(state1 - state2) from input data'''
+        return np.interp(np.abs(state1 - state2), self.x, self.y)
+
+def viterbi(obs, states, start_p, trans_p, emit_p):
+    '''Viterbi algo from http://en.wikipedia.org/wiki/Viterbi_algorithm'''
+    V = [{}]
+    path = {}
+ 
+    # Initialize base cases (t == 0)
+    for y in states:
+        V[0][y] = start_p[y] * emit_p[y][obs[0]]
+        path[y] = [y]
+ 
+    # Run Viterbi for t > 0
+    for t in range(1, len(obs)):
+        V.append({})
+        newpath = {}
+ 
+        for y in states:
+            (prob, state) = max((V[t-1][y0] * trans_p[y0][y] * emit_p[y][obs[t]], y0) for y0 in states)
+            V[t][y] = prob
+            newpath[y] = path[state] + [y]
+ 
+        # Don't need to remember the old paths
+        path = newpath
+    n = 0           # if only one element is observed max is sought in the initialization values
+    if len(obs)!=1:
+        n = t
+    print_dptable(V)
+    (prob, state) = max((V[n][y], y) for y in states)
+    return (prob, path[state])
