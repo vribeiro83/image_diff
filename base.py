@@ -350,7 +350,8 @@ def find_changepoints(y, zmax=20):
     trans_p = General_PDF(pdf_x, pdf_y)
     # Get emmission probs by sigma clipping data
     emiss_mean, emiss_std = Sigmaclip(y)
-    states = np.unique(y)
+    states = np.histogram(np.abs(np.diff(randomsample)), 50)[1]
+    viterbi(y, states, norm(loc=emiss_mean, scale=emiss_std), trans_p, norm)
     
 class General_PDF(object):
     def __init__(self, x, y):
@@ -360,32 +361,39 @@ class General_PDF(object):
     def __call__(self, state1, state2):
         '''Calulates the prob of abs(state1 - state2) from input data'''
         return np.interp(np.abs(state1 - state2), self.x, self.y)
+    def pdf(self, state1, state2):
+        return self.__call__(state1, state2)
+    def logpdf(self, state1, state2):
+        return np.log(self.__call__(state1, state2))
 
 def viterbi(obs, states, start_p, trans_p, emit_p):
     '''Viterbi algo from http://en.wikipedia.org/wiki/Viterbi_algorithm'''
     V = [{}]
     path = {}
- 
-    # Initialize base cases (t == 0)
+    states = np.sort(states)
+    # Initialize base cases (t == 0)   
     for y in states:
-        V[0][y] = start_p[y] * emit_p[y][obs[0]]
+        V[0][y] = start_p.logpdf(y) + emit_p.logpdf(obs[0], y, start_p.std()) 
         path[y] = [y]
  
     # Run Viterbi for t > 0
-    for t in range(1, len(obs)):
+    for t in xrange(1, len(obs)):
+        #print t
         V.append({})
         newpath = {}
- 
+        # stuff for loop
+        argsort = np.argsort(V[t-1].keys())
+        oldV = np.asarray(V[t-1].values())[argsort]
+        Emit = emit_p.logpdf(obs[t], states, start_p.std())
         for y in states:
-            (prob, state) = max((V[t-1][y0] * trans_p[y0][y] * emit_p[y][obs[t]], y0) for y0 in states)
-            V[t][y] = prob
-            newpath[y] = path[state] + [y]
+            probs  = (oldV + trans_p.logpdf(states, y) + Emit)
+            V[t][y] = probs.max()
+            newpath[y] = path[states[probs.argmax()]] + [y]
  
         # Don't need to remember the old paths
         path = newpath
     n = 0           # if only one element is observed max is sought in the initialization values
     if len(obs)!=1:
         n = t
-    print_dptable(V)
     (prob, state) = max((V[n][y], y) for y in states)
     return (prob, path[state])
