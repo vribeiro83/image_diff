@@ -350,8 +350,20 @@ def find_changepoints(y, zmax=20):
     trans_p = General_PDF(pdf_x, pdf_y)
     # Get emmission probs by sigma clipping data
     emiss_mean, emiss_std = Sigmaclip(y)
-    states = np.histogram(np.abs(np.diff(randomsample)), 50)[1]
-    viterbi(y, states, norm(loc=emiss_mean, scale=emiss_std), trans_p, norm)
+    # iteratively change upper state till max prob
+    best_prob, best_state,best_changepoints  = -np.inf, 0., None
+    for upper in np.unique(y)[::-1]:
+        if upper <= emiss_mean:
+            break
+        states = np.array([emiss_mean, upper])
+        prob, changepoints = viterbi(y, states, norm(loc=emiss_mean,
+                                                 scale=emiss_std),
+                                                 trans_p, norm)
+        if prob > best_prob:
+             best_prob = prob + 0
+             best_state = upper + 0
+             best_changepoints = np.asarray(changepoints) + 0
+    return best_prob, best_changepoints
     
 class General_PDF(object):
     def __init__(self, x, y):
