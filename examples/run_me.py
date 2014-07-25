@@ -3,6 +3,7 @@ import mpi4py.MPI as mpi
 import sys
 import os
 from glob import glob
+import time
 
 def num_files_left(files):
     '''Returns number of files to be completed'''
@@ -12,7 +13,7 @@ def num_files_left(files):
         #if os.path.exists(local+'.jpg') and os.path.exists(local[:-4] +'.csv'):
         if os.path.exists(local[:-4] +'.csv'):
             rem_file += 1
-    return rem_file
+    return len(files) - rem_file
 
 files = glob(os.path.join(sys.argv[1],'HB*/*/*/*.MTS'))
 for File in files:
@@ -30,6 +31,7 @@ for File in files:
     if mpi.COMM_WORLD.Get_size() > 1:
         if mpi.COMM_WORLD.rank == 0:
             print File, '\nFiles left is %i'%num_files_left(files)
+            time_start = time.time()
         video = Reduced_chi(File)
         work_array = video.mpi_work_split()
         frame_no, frame_time, frame_chi = video.parallel_moving_ave(work_array)
@@ -40,6 +42,8 @@ for File in files:
             # Make plot
             #video.plot(local[:-4], show=False)
         video.comm.barrier()
+        if mpi.COMM_WORLD.rank == 0:
+            print 'It took %f seconds'%(time.time() - time_start)
     else:
         # Print missing
         print '%s is missing.'%File
