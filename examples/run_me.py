@@ -43,7 +43,7 @@ for File in files:
             #video.plot(local[:-4], show=False)
         video.comm.barrier()
         if mpi.COMM_WORLD.rank == 0:
-            print 'It took %f seconds'%(time.time() - time_start)
+            print 'It took %.1f seconds for a %2.1f GB file'%(time.time() - time_start, os.path.getsize(File)*10**-9)
     else:
         # Print missing
         print '%s is missing.'%File
