@@ -4,6 +4,15 @@ import sys
 import os
 from glob import glob
 
+def num_files_left(files):
+    '''Returns number of files to be completed'''
+    rem_file = 0
+    for f in files:
+        local = '/'.join(f.split('/')[2:])
+        #if os.path.exists(local+'.jpg') and os.path.exists(local[:-4] +'.csv'):
+        if os.path.exists(local[:-4] +'.csv'):
+            rem_file += 1
+    return rem_file
 
 files = glob(os.path.join(sys.argv[1],'HB*/*/*/*.MTS'))
 for File in files:
@@ -19,7 +28,8 @@ for File in files:
                 os.mkdir('/'.join(local.split('/')[:i]))
     # Run if more than 1 chain
     if mpi.COMM_WORLD.Get_size() > 1:
-        print File
+        if mpi.COMM_WORLD.rank == 0:
+            print File, '\nFiles left is %i'%num_files_left(files)
         video = Reduced_chi(File)
         work_array = video.mpi_work_split()
         frame_no, frame_time, frame_chi = video.parallel_moving_ave(work_array)
@@ -33,4 +43,5 @@ for File in files:
     else:
         # Print missing
         print '%s is missing.'%File
-                    
+        print '\nFiles left is %i'%num_files_left(files)        
+        
