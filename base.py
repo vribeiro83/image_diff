@@ -158,14 +158,16 @@ class Video(object):
         # Create datetime array
         self.frame_datetime = np.asarray(self._time2datetime(self.frame_time))
         #save as a dataframe since they can have multiple types
-        out_data = np.vstack((self.frame_no, self.frame_time,
-                               self.frame_chi)).T
+        out_data = np.vstack((self.frame_datetime, self.frame_no, 
+                              self.frame_time, self.frame_chi )).T
         # rm nan and inf values
-        out_data = out_data[np.isfinite(out_data[:,2])]
-        self.frame_no = out_data[np.isfinite(out_data[:,2]), 0]
-        self.frame_time = out_data[np.isfinite(out_data[:,2]),1]
-        self.frame_chi = out_data[np.isfinite(out_data[:,2]),2]
-        self.frame_datetime = self.frame_datetime[np.isfinite(out_data[:,2])]
+        out_data = out_data[np.isfinite(np.float32(out_data[:,-1]))]
+        self.frame_no = out_data[np.isfinite(np.float32(out_data[:,-1])), 1]
+        self.frame_time = out_data[np.isfinite(np.float32(out_data[:,-1])),2]
+        self.frame_chi = out_data[np.isfinite(np.float32(out_data[:,-1])),3]
+        self.frame_datetime = out_data[np.isfinite(np.float32(out_data[:,-1]))
+                                       ,0]
+        
         # get DataFrame ready
         temp = pd.DataFrame(data=out_data, index= self.frame_datetime,
                              columns=['Date_time', 'frame_number',
