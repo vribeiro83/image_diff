@@ -36,7 +36,7 @@ for File in files:
             shutil.copy(File, 'temp.MTS')
             time_start = time.time()
         try:
-            video.comm.barrier()
+            mpi.COMM_WORLD.barrier()
             video = Reduced_chi('temp.MTS')
         except ValueError:
             print 'There was a problem with %s.'%File
