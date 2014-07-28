@@ -17,4 +17,4 @@ if video.rank == 0:
     # Make plot
     video.save_result()
     video.plot(show=False)
-    video.make_movie()
+    #video.make_movie()

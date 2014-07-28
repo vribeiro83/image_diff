@@ -4,6 +4,7 @@ import sys
 import os
 from glob import glob
 import time
+import shutil 
 
 def num_files_left(files):
     '''Returns number of files to be completed'''
@@ -31,16 +32,18 @@ for File in files:
     if mpi.COMM_WORLD.Get_size() > 1:
         if mpi.COMM_WORLD.rank == 0:
             print File, '\nFiles left is %i'%num_files_left(files)
+            # copy file to local
+            shutil.copy(File, 'temp.MTS')
             time_start = time.time()
-        video = Reduced_chi(File)
-        work_array = video.mpi_work_split()
         try:
-            frame_no, frame_time, frame_chi = video.parallel_moving_ave(work_array)
+            video.comm.barrier()
+            video = Reduced_chi('temp.MTS')
         except ValueError:
             print 'There was a problem with %s.'%File
             continue
+        work_array = video.mpi_work_split()
+        frame_no, frame_time, frame_chi = video.parallel_moving_ave(work_array)
         video.aggrigate_to_root(frame_no, frame_time, frame_chi)
-        video.comm.barrier()
         if video.rank == 0:
             video.save_result(local[:-4] +'.csv')
             # Make plot
