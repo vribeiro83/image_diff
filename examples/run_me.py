@@ -34,7 +34,11 @@ for File in files:
             time_start = time.time()
         video = Reduced_chi(File)
         work_array = video.mpi_work_split()
-        frame_no, frame_time, frame_chi = video.parallel_moving_ave(work_array)
+        try:
+            frame_no, frame_time, frame_chi = video.parallel_moving_ave(work_array)
+        except ValueError:
+            print 'There was a problem with %s.'%File
+            continue
         video.aggrigate_to_root(frame_no, frame_time, frame_chi)
         video.comm.barrier()
         if video.rank == 0:
