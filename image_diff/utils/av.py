@@ -1,3 +1,54 @@
+import cv2
+import numpy as np
+import pylab as plt
+from matplotlib.ticker import MultipleLocator, FormatStrFormatter
+import datetime
+
+
+
+def plot(time, chi, filename=None, show=True, dpi=600):
+    '''Makes plots of time vs chi'''
+    majorLocator   = MultipleLocator(5)
+    majorFormatter = FormatStrFormatter('%d')
+    minorLocator   = MultipleLocator(1)
+
+    frameTime, frame_chi = time, chi
+    
+    dpi = 600
+        
+        minChi, maxChi = min(redChi), max(redChi)
+        averageChi = float(sum(redChi) / len(redChi))
+
+        #plt.axhline(y=3*minChi)
+
+        ax = plt.subplot(1, 1, 1)
+        #plt.figure()
+        ax.xaxis.set_major_locator(majorLocator)
+        ax.xaxis.set_major_formatter(majorFormatter)
+        ax.xaxis.set_minor_locator(minorLocator)
+    
+        plt.tick_params(axis='both', which='major', length=10)
+        plt.tick_params(axis='both', which='minor', length=5)
+        
+        plt.ylim([minChi, maxChi])
+        plt.xlim([minTime, maxTime])
+        plt.xlabel("Time (min)")
+        plt.ylabel("Reduced Chi-squared")
+
+        plt.gca().set_yscale('log')
+
+        xpos, ypos = float(minTime), float(maxChi/1.5)
+        plt.text(xpos, ypos, self.video_path)
+
+ 
+        plt.plot(self._msec2min(frameTime), redChi, 'k-')
+        if filename is None:
+            plt.savefig(self.video_path + ".jpg", dpi=self.dpi)
+        else:
+            plt.savefig(filename + ".jpg", dpi=self.dpi)
+        if show:
+            plt.show()
+
     def make_movie(self, movie_obj):
         '''
         TO CREATE MOVIE

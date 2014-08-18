@@ -1,3 +1,7 @@
+import numpy as np
+from other import Sigmaclip
+
+
 def find_changepoints(y, zmax=20):
     '''Finds changepoints in data with hmm and viterbi algo.
     Estimates the transmission and emission probs from data'''

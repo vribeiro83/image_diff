@@ -1,3 +1,7 @@
+import numpy as np
+from scipy.stats import sigmaclip
+
+
 def Sigmaclip(array, low=4., high=4, axis=None):
     '''(ndarray, int, int, int) -> ndarray
 
@@ -24,7 +28,7 @@ def Sigmaclip(array, low=4., high=4, axis=None):
     '''
     c = np.asarray(array)
     if axis is None or c.ndim == 1:
-        from scipy.stats import sigmaclip
+        #from scipy.stats import sigmaclip
         out = sigmaclip(c)[0]
         return out.mean(), out.std()
     #create masked array

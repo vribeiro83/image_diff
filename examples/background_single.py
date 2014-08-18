@@ -1,4 +1,4 @@
-from __init__ import Background_detct
+from image_diff.detectors import Background_detct
 import sys
 
 

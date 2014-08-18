@@ -4,7 +4,7 @@ setup(
     version = "1.0",
     packages = find_packages(),
     install_requires = ['mpi4py>=1.3','numpy>=1.6', 'pandas>=0.13'
-                        , 'scipy>=0.12', 'cv2>2.3','matplotlib>=1.3'],
+                        , 'scipy>=0.12', 'matplotlib>=1.3'],
     # metadata for upload to PyPI
     author = "Thuso Simon and Valerio Ribeiro",
     author_email = "dr.danger.simon@gmail.com",
