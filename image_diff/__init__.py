@@ -1,6 +1,6 @@
 #!/usr/bin/python2
 
-import dectectors
+import detectors
 import test
 import utils
 

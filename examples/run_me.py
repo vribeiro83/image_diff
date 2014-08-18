@@ -25,10 +25,11 @@ for File in files:
     if os.path.exists(local[:-4] +'.csv'):
         continue
     else:
-        # make path if not there to save point
-        for i in range(1,len(local.split('/'))):
-            if not os.path.exists('/'.join(local.split('/')[:i])):
-                os.mkdir('/'.join(local.split('/')[:i]))
+        if mpi.COMM_WORLD.rank == 0:
+            # make path if not there to save point
+            for i in range(1,len(local.split('/'))):
+                if not os.path.exists('/'.join(local.split('/')[:i])):
+                    os.mkdir('/'.join(local.split('/')[:i]))
     # Run if more than 1 chain
     if mpi.COMM_WORLD.Get_size() > 1:
         if mpi.COMM_WORLD.rank == 0:

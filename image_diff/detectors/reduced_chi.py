@@ -69,16 +69,10 @@ class Reduced_chi(Video):
             frame = np.float32(frame)
             self.frame_no.append(frame_no)
             # add 1 so chi square can't be nan or inf
-            try:
-                self.frame_chi.append(chisquare(frame+1,
-                                            self.moving_ave_frame+1).sum()
-                                                                     / ddof)
-            except AttributeError:
-                import cPickle as pik
-                import ipdb
-                ipdb.set_trace()
-                pik.dump((frame, self.moving_ave_frame,self.video_path),open('t','w'),2)
-                         
+            self.frame_chi.append(chisquare(frame+1,
+                            self.moving_ave_frame+1).sum()
+                            / ddof)
+                          
             # Calculate new average frame
             cv2.accumulateWeighted(frame, self.moving_ave_frame, alpha)
 
@@ -126,5 +120,5 @@ def chisquare(f_obs, f_exp, axis=0):
     try:
         return (f_obs - f_exp)**2 / f_exp
     except ValueError:
-        print 'wrong size'
-        return 'error'
+        raise  ValueError('Video file may be currpt. Frames are different size')
+       
