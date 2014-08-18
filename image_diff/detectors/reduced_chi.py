@@ -1,7 +1,6 @@
 from base import Video
 import numpy as np
 import cv2
-import ipdb
 
 
 class Reduced_chi(Video):

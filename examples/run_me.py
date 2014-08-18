@@ -1,4 +1,4 @@
-from __init__ import Reduced_chi
+from image_diff.detectors import Reduced_chi
 import mpi4py.MPI as mpi
 import sys
 import os

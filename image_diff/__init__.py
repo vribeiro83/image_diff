@@ -1,10 +1,11 @@
 #!/usr/bin/python2
 
-from reduced_chi import Reduced_chi
-from background_subtract import Background_detect
-from object_detect import Obj_dectect
+import dectectors
+import test
+import utils
 
-__all__ = ['reduced_chi','background_subtract','object_detect']
+
+#__all__ = ['reduced_chi','background_subtract','object_detect']
 
 # put help message
 '''
