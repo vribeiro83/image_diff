@@ -10,7 +10,7 @@ def num_files_left(files):
     '''Returns number of files to be completed'''
     rem_file = 0
     for f in files:
-        local = '/'.join(f.split('/')[2:])
+        local = '/'.join(f.split('/')[4:])
         #if os.path.exists(local+'.jpg') and os.path.exists(local[:-4] +'.csv'):
         if os.path.exists(local[:-4] +'.csv'):
             rem_file += 1
@@ -19,7 +19,8 @@ def num_files_left(files):
 files = glob(os.path.join(sys.argv[1],'HB*/*/*/*.MTS'))
 for File in files:
     # Check if path exsists
-    local = '/'.join(File.split('/')[2:])
+    local = '/'.join(File.split('/')[4:])
+    #local = '/'.join(File.split('/')[1:])
     #if os.path.exists(local+'.jpg') and os.path.exists(local[:-4] +'.csv'):
     if os.path.exists(local[:-4] +'.csv'):
         continue
@@ -31,13 +32,14 @@ for File in files:
     # Run if more than 1 chain
     if mpi.COMM_WORLD.Get_size() > 1:
         if mpi.COMM_WORLD.rank == 0:
-            print File, '\nFiles left is %i'%num_files_left(files)
+            print File, '\n%i files are left.'%num_files_left(files)
             # copy file to local
-            shutil.copy(File, 'temp.MTS')
+            #shutil.copy(File, 'temp.MTS')
             time_start = time.time()
         try:
             mpi.COMM_WORLD.barrier()
-            video = Reduced_chi('temp.MTS')
+            #video = Reduced_chi('temp.MTS')
+            video = Reduced_chi(File)
         except ValueError:
             print 'There was a problem with %s.'%File
             continue

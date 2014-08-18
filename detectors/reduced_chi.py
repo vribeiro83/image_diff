@@ -38,12 +38,14 @@ class Reduced_chi(Video):
     def parallel_moving_ave(self, frame_array, n_sample=120, alpha=0.02):
         '''Does same as moving_ave_chi but in parrallel'''
         # Check for master image
+        print frame_array, max(frame_array)
         if not 'moving_ave_frame' in vars(self):
             # Check if at zero
-            if np.min(frame_array) - n_sample < 0:
+            if min(frame_array) - n_sample < 0:
                 start = 0
             else:
-                start = np.min(frame_array) - n_sample
+                start = min(frame_array) - n_sample
+            
             self.moving_ave_frame = self._get_initial_master(start, n_sample)
             
         self.frame_no = []
@@ -59,14 +61,25 @@ class Reduced_chi(Video):
                 # remove frame_no
                 #self.frame_no.pop(self.frame_no.index(frame_no))
                 continue
+            # make sure frame is same size as moving average
+            if not np.all(np.asarray(frame.shape) ==
+                          np.asarray(self.moving_ave_frame.shape)):
+                continue
             self.frame_time.append(self.cap.get(cv2.cv.CV_CAP_PROP_POS_MSEC))
             # Cal chi
             frame = np.float32(frame)
             self.frame_no.append(frame_no)
             # add 1 so chi square can't be nan or inf
-            self.frame_chi.append(chisquare(frame+1,
+            try:
+                self.frame_chi.append(chisquare(frame+1,
                                             self.moving_ave_frame+1).sum()
-                                                                     / ddof)              
+                                                                     / ddof)
+            except AttributeError:
+                import cPickle as pik
+                import ipdb
+                ipdb.set_trace()
+                pik.dump((frame, self.moving_ave_frame,self.video_path),open('t','w'),2)
+                         
             # Calculate new average frame
             cv2.accumulateWeighted(frame, self.moving_ave_frame, alpha)
 
@@ -111,4 +124,8 @@ class Reduced_chi(Video):
     
 def chisquare(f_obs, f_exp, axis=0):
     '''calculates chi squared test correctly for 3D arrays'''
-    return (f_obs - f_exp)**2 / f_exp
+    try:
+        return (f_obs - f_exp)**2 / f_exp
+    except ValueError:
+        print 'wrong size'
+        return 'error'

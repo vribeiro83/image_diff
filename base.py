@@ -21,12 +21,40 @@ class Video(object):
         #video info
         self.video_path = video_path
         self.cap = cv2.VideoCapture(video_path)
-        self.f_rate = int(self.cap.get(cv2.cv.CV_CAP_PROP_FPS))
+        if not np.isfinite(self.cap.get(cv2.cv.CV_CAP_PROP_FPS)):
+            self.f_rate = self._man_fps()
+        else:
+            self.f_rate = int(self.cap.get(cv2.cv.CV_CAP_PROP_FPS))
         self.frames = int(self.cap.get(cv2.cv.CV_CAP_PROP_FRAME_COUNT))
+        if self.frames < 0:
+            # there is a problem get frame num from iterating
+            self.cap.set(cv2.cv.CV_CAP_PROP_POS_FRAMES, abs(self.frames))
+            if not self.cap.get(cv2.cv.CV_CAP_PROP_POS_FRAMES) ==abs(self.frames):
+                raise ValueError('Problem with video ')
+            sucess, frame = self.cap.read()
+            if sucess:
+                sucess = False
+                self.frames = abs(self.frames)
+            else:
+                sucess = True
+                self.frames = 0
+            while sucess:
+                self.cap.set(cv2.cv.CV_CAP_PROP_POS_FRAMES,self.frames)
+                sucess, frame = self.cap.read()
+                self.frames += 500
+                
+            print 'frames =', self.frames
         self.f_sec = 1 / self.f_rate
         self.width = int(self.cap.get(cv2.cv.CV_CAP_PROP_FRAME_WIDTH))
         self.height = int(self.cap.get(cv2.cv.CV_CAP_PROP_FRAME_HEIGHT))
-
+        
+    def _man_fps(self):
+        '''manually calculate fps from 2 different frame times'''
+        t_start = self.cap.get(cv2.cv.CV_CAP_PROP_POS_MSEC)
+        self.cap.read()
+        t_stop = self.cap.get(cv2.cv.CV_CAP_PROP_POS_MSEC)
+        return 1. /self._msec2sec(t_stop - t_start)
+           
     def _msec2min(self, msec):
         '''Converts miliseconds to min'''
         return msec * 1.6666666666666667e-05
@@ -96,7 +124,7 @@ class Video(object):
         # Make split array
         split = np.linspace(start, max_frames, self.size+1).round()
         frame_min, frame_max = int(split[self.rank]),int(split[self.rank + 1])
-        return range(frame_min, frame_max, stride)
+        return xrange(frame_min, frame_max, stride)
         
 
     def aggrigate_to_root(self, frame_no, frame_time, frame_chi):
@@ -293,121 +321,3 @@ class Video(object):
                         success, frame = self.cap.read()
                         out.write(frame)
                         
-def Sigmaclip(array, low=4., high=4, axis=None):
-    '''(ndarray, int, int, int) -> ndarray
-
-    Iterative sigma-clipping of along the given axis.
-	   
-    The output array contains only those elements of the input array `c`
-    that satisfy the conditions ::
-	   
-    mean(c) - std(c)*low < c < mean(c) + std(c)*high
-	
-    Parameters
-    ----------
-    a : array_like
-    data array
-    low : float
-    lower bound factor of sigma clipping
-    high : float
-    upper bound factor of sigma clipping
-    
-    Returns
-    -------
-    c : array
-    sigma clipped mean along axis
-    '''
-    c = np.asarray(array)
-    if axis is None or c.ndim == 1:
-        from scipy.stats import sigmaclip
-        out = sigmaclip(c)[0]
-        return out.mean(), out.std()
-    #create masked array
-    c_mask = np.ma.masked_array(c, np.isnan(c))
-    delta = 1
-    while delta:
-           c_std = c_mask.std(axis=axis)
-           c_mean = c_mask.mean(axis=axis)
-           size = c_mask.mask.sum()
-           critlower = c_mean - c_std*low
-           critupper = c_mean + c_std*high
-           indexer = [slice(None)] * c.ndim
-           for i in xrange(c.shape[axis]):
-               indexer[axis] = slice(i,i+1)
-               c_mask[indexer].mask = np.logical_and(
-                   c_mask[indexer].squeeze() > critlower, 
-                   c_mask[indexer].squeeze() < critupper) == False
-           delta = size - c_mask.mask.sum()
-    return c_mask.mean(axis).data, c_mask.std(axis).data
-
-def find_changepoints(y, zmax=20):
-    '''Finds changepoints in data with hmm and viterbi algo.
-    Estimates the transmission and emission probs from data'''
-    y = np.asarray(y)
-    # estimate transmission pdf as exp with boot straping?
-    randomsample = np.random.choice(y, size=len(y)*20)
-    pdf_y,pdf_x = np.histogram(np.abs(np.diff(randomsample)), 400, normed=True)
-    pdf_y[pdf_y == 0] = 1e-99
-    pdf_x = pdf_x[:-1]
-    trans_p = General_PDF(pdf_x, pdf_y)
-    # Get emmission probs by sigma clipping data
-    emiss_mean, emiss_std = Sigmaclip(y)
-    # iteratively change upper state till max prob
-    best_prob, best_state,best_changepoints  = -np.inf, 0., None
-    for upper in np.unique(y)[::-1]:
-        if upper <= emiss_mean:
-            break
-        states = np.array([emiss_mean, upper])
-        prob, changepoints = viterbi(y, states, norm(loc=emiss_mean,
-                                                 scale=emiss_std),
-                                                 trans_p, norm)
-        if prob > best_prob:
-             best_prob = prob + 0
-             best_state = upper + 0
-             best_changepoints = np.asarray(changepoints) + 0
-    return best_prob, best_changepoints
-    
-class General_PDF(object):
-    def __init__(self, x, y):
-        self.x = x
-        # renormalize
-        self.y = y/y.sum()
-    def __call__(self, state1, state2):
-        '''Calulates the prob of abs(state1 - state2) from input data'''
-        return np.interp(np.abs(state1 - state2), self.x, self.y)
-    def pdf(self, state1, state2):
-        return self.__call__(state1, state2)
-    def logpdf(self, state1, state2):
-        return np.log(self.__call__(state1, state2))
-
-def viterbi(obs, states, start_p, trans_p, emit_p):
-    '''Viterbi algo from http://en.wikipedia.org/wiki/Viterbi_algorithm'''
-    V = [{}]
-    path = {}
-    states = np.sort(states)
-    # Initialize base cases (t == 0)   
-    for y in states:
-        V[0][y] = start_p.logpdf(y) + emit_p.logpdf(obs[0], y, start_p.std()) 
-        path[y] = [y]
- 
-    # Run Viterbi for t > 0
-    for t in xrange(1, len(obs)):
-        #print t
-        V.append({})
-        newpath = {}
-        # stuff for loop
-        argsort = np.argsort(V[t-1].keys())
-        oldV = np.asarray(V[t-1].values())[argsort]
-        Emit = emit_p.logpdf(obs[t], states, start_p.std())
-        for y in states:
-            probs  = (oldV + trans_p.logpdf(states, y) + Emit)
-            V[t][y] = probs.max()
-            newpath[y] = path[states[probs.argmax()]] + [y]
- 
-        # Don't need to remember the old paths
-        path = newpath
-    n = 0           # if only one element is observed max is sought in the initialization values
-    if len(obs)!=1:
-        n = t
-    (prob, state) = max((V[n][y], y) for y in states)
-    return (prob, path[state])
