@@ -11,6 +11,10 @@ setup(
     description = "Program to detect birds from video footage",
     license = "MIT",
     keywords = "image differencing, change points",
-    url = "https://github.com/drdangersimon/image_diff",   
-    
+    url = "https://github.com/drdangersimon/image_diff",
+    classifiers=[
+        "Development Status :: 3 - Alpha",
+        'License :: OSI Approved :: MIT License',
+        'Programming Language :: Python :: 2 :: Only',
+        'Topic :: Scientific/Engineering :: Image Recognition']
 )
