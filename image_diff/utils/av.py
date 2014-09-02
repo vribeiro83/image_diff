@@ -16,7 +16,7 @@ def plot(time, chi, filename=None, show=True, dpi=600):
     
     dpi = 600
         
-        minChi, maxChi = min(redChi), max(redChi)
+    '''minChi, maxChi = min(redChi), max(redChi)
         averageChi = float(sum(redChi) / len(redChi))
 
         #plt.axhline(y=3*minChi)
@@ -47,9 +47,9 @@ def plot(time, chi, filename=None, show=True, dpi=600):
         else:
             plt.savefig(filename + ".jpg", dpi=self.dpi)
         if show:
-            plt.show()
+            plt.show()'''
 
-    def make_movie(self, movie_obj):
+def make_movie(movie_obj):
         '''
         TO CREATE MOVIE
         http://opencv-python-tutroals.readthedocs.org/en/latest/py_tutorials/py_gui/py_video_display/py_video_display.html
@@ -60,7 +60,7 @@ def plot(time, chi, filename=None, show=True, dpi=600):
         #fourcc = cv2.cv.CV_FOURCC('D','I','V','X')
         #fourcc = cv2.cv.CV_FOURCC('M','P','V','4')
         #fourcc = cv2.cv.CV_FOURCC('M','P','E','G')
-        fourcc = cv2.cv.CV_FOURCC('X', '2', '6', '4')
+        '''fourcc = cv2.cv.CV_FOURCC('X', '2', '6', '4')
         out = cv2.VideoWriter(self.video_path + '.mp4',fourcc, self.fps,
                               (self.width/4,self.height/4))
         print "Making a movie, I am rank: ", self.rank
@@ -82,5 +82,18 @@ def plot(time, chi, filename=None, show=True, dpi=600):
                     for j in range(int(self.frame_no[i]), int(self.frame_no[i+1]), 1):
                         self.cap.set(cv2.cv.CV_CAP_PROP_POS_FRAMES, j)
                         success, frame = self.cap.read()
-                        out.write(frame)
+                        out.write(frame)'''
                         
+def get_frame(path, frame_no, show=False):
+        '''gets frame from movie. frame_no should be a list'''
+        assert isinstance(frame_no, (list, np.ndarray))
+        cap = cv2.VideoCapture(path)
+        out = []
+        for frame in frame_no:
+            cap.set(cv2.cv.CV_CAP_PROP_POS_FRAMES, frame+25)
+            sucess, image = cap.read()
+            if not sucess:
+                break
+            out.append([image, frame])
+
+        return out
