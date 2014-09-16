@@ -16,7 +16,7 @@ import scipy.stats as stats
 def find_csv(path):
     '''Returns list of .csv. dict where keys are dir and items is path to csv'''
     files = {}
-    walk = os.walk(path)
+    walk = os.walk(os.path.abspath(path))
     #walk through dir structure finding all csv files
     for dirpath, dirnames, filenames in walk:
         for file in filenames:
@@ -35,18 +35,43 @@ def make_plots(path, dir_plot=True):
     for dir in files:
         # open csv
         temp_file = np.loadtxt()
-    
-def find_hornbils(path, evidence=6., doub_check=False):
-    '''Makes videos for each dir of finding birds using change point analyisis.
-     Will put a big blue label up between events.
-     Uses BIC criteron to decide if bird or background noise.
-     If want to double check if bird is there, use cascade classfiyer and
-     put path to .xml file.
 
-     Uses multiprocessing.'''
+def mkpath(file, out_path, start='HB'):
+    '''Makes dir tree for file starting in file's start in out_path.'''
+    index = file.find(start)
+    if index < 0:
+        return None
+    make_path = os.path.split(os.path.join(out_path, file[index:]))[0].split(os.path.sep)
+    for i in range(1, len(make_path)):
+        if not os.path.exists(os.path.sep.join(make_path[:i])):
+            os.mkdir(os.path.sep.join(make_path[:i]))
+    # make last dir
+    if not os.path.exists(os.path.sep.join(make_path)):
+        os.mkdir(os.path.sep.join(make_path))
+    
+def find_hornbils_chi(path, out_path, p_value=0.01, double_check=False):
+    '''Combines all csv files into single file with columns of:
+    chi_max, duration, video time (min), frame_no, path to .mts file
+    path - path to csv dirs
+    out_path - makes same dir tree as path but with 1 csv file in each leaf
+    p_value - p_value to use to find birds (affects FPR and FNR)
+    double_check - if true, will use a classifyer to check if bird is there.'''
+    # make dir for out_path if not exsists
+    if not os.path.exists(out_path):
+        os.mkdir(out_path)
     files = find_csv(path)
     for dir in files:
-        pass
+        # make path if no there
+        mkpath(files[dir][0], out_path)
+        # process all files in dir
+        data = []
+        for csv in files[dir]:
+            header(file)
+            # get delta log-like
+            data.append(pd.DataFrame.from_csv(file, infer_datetime_format=True, sep='\t'))
+        chi_name = data.columns[-1]
+        time_name = data.columns[1]
+
     
 def chpt_details(chpt, time, chi):
     '''Returns frames of mean frame of a change point'''
@@ -120,7 +145,7 @@ def test_evidence(path, video_path):
         time_name = data.columns[1]
         # HMM 93% FPR
         #dlik, chpt = id.utils.find_changepoints(data[chi_name])
-        # chi values
+        # chi values 96% FPR
         dlik, chpt = chi_test(data[chi_name])
         # get frames, max chi and durration from high states
         index, durration, max_chi = chpt_details(chpt, data[time_name]
