@@ -48,6 +48,7 @@ def mkpath(file, out_path, start='HB'):
     # make last dir
     if not os.path.exists(os.path.sep.join(make_path)):
         os.mkdir(os.path.sep.join(make_path))
+    return os.path.sep.join(make_path)
     
 def find_hornbils_chi(path, out_path, p_value=0.01, double_check=False):
     '''Combines all csv files into single file with columns of:
@@ -60,21 +61,54 @@ def find_hornbils_chi(path, out_path, p_value=0.01, double_check=False):
     if not os.path.exists(out_path):
         os.mkdir(out_path)
     files = find_csv(path)
-    for dir in files:
+    tot_files = len(files.values())
+    i = 0
+    for dir in files.keys:
+        print ' %i directories left'%(tot_files - i)
+        i += 1 
         # make path if no there
-        mkpath(files[dir][0], out_path)
+        write_path = mkpath(files[dir][0], out_path)
         # process all files in dir
-        data = []
+        data, chpt, dir_list = [], [], []
         for csv in files[dir]:
-            header(file)
+            header(csv)
             # get delta log-like
-            data.append(pd.DataFrame.from_csv(file, infer_datetime_format=True, sep='\t'))
-        chi_name = data.columns[-1]
-        time_name = data.columns[1]
-
+            try:
+                data.append(pd.DataFrame.from_csv(csv, infer_datetime_format=True, sep='\t'))
+                chi_name = data[-1].columns[-1]
+                time_name = data[-1].columns[1]
+                # find birds with chi test
+                temp_chpt = chi_test(data[-1][chi_name], p_value)[1]
+                # check if any chpts
+                if len(np.unique(temp_chpt)) == 1:
+                    data.pop(-1)
+                    continue
+                chpt.append(chpt_details(temp_chpt,data[-1][time_name],
+                                        data[-1][chi_name]))
+                dir_list.append([csv]*chpt[-1][0].shape[0])
+            except:
+                print csv
+                raise
+        # check if anything was found
+        if len(dir_list) == 0:
+            continue
+        dir_list = np.hstack(dir_list)
+        to_write = np.vstack((np.hstack(chpt),
+                               dir_list.reshape(1, dir_list.shape[0]))).T
+        # remove nans
+        index = np.isfinite(np.float32(to_write[:,1]))
+        to_write = to_write[index]
+        # change time
+        to_write[:,1] = map(hms, to_write[:,1])
+        # write file
+        np.savetxt(os.path.join(write_path,'all.csv'), to_write,'%s', delimiter=','
+                   ,header='Frame_number, time(HH:MM:SS), Duration, max_chi, original_File' )
+            
+                
+ 
     
 def chpt_details(chpt, time, chi):
-    '''Returns frames of mean frame of a change point'''
+    '''Returns frames, mean time(msc), duration,  mean frame of a change point'''
     # make arrays
     time = np.asarray(time)
     chi = np.asarray(chi)
@@ -87,14 +121,16 @@ def chpt_details(chpt, time, chi):
     out_index = []
     out_max_chi = []
     out_duration = []
+    out_time = []
     start = 0
     for diff in np.where(np.diff(index) > 1)[0]:
         # print chpt[index[start]:index[diff]+1]
         out_index.append((index[start]+index[diff]+1)/2)
         out_max_chi.append(np.max(chi[start:diff+1]))
         out_duration.append(time[diff+1] - time[start])
+        out_time.append(np.mean(time[start:diff+1]))
         start = diff +1
-    return np.asarray(out_index), np.asarray(out_duration), np.asarray(out_max_chi)
+    return np.asarray(out_index), np.asarray(out_time),np.asarray(out_duration), np.asarray(out_max_chi)
 
 
 def header(path):
@@ -115,7 +151,7 @@ def header(path):
 def chi_test(chi, p_value=.01):
     '''Does chi test with 1 ddof to see if change was significant'''
     p = stats.chisqprob(np.asarray(chi), 1)
-    return p.min(), np.int32(p <= p_value)
+    return p.max(), np.int32(p <= p_value)
             
 def test_evidence(path, video_path):
     '''Does test to see what bayes factor is needed to find a bird versus noise'''
@@ -188,3 +224,20 @@ def test_evidence(path, video_path):
     img = np.vstack(img)
     #tra = np.hstack((lik, img))
     clf.fit(lik, has_bird)
+
+
+def hms(msec):
+    '''Turns msec to hh:mm:ss str format'''
+    sec = float(msec) * 10**-3
+    m = int(sec / 60)
+    sec = sec % 60
+    h = int(m / 60)
+    m = m % 60
+    return '%02i:%02i:%02i'%(h,m,sec)
+
+
+if __name__ == '__main__':
+    import sys
+    path = sys.argv[1]
+    out_path = sys.argv[2]
+    find_hornbils_chi('../honrbil/', 'test')
