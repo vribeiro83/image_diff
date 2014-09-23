@@ -63,7 +63,7 @@ def find_hornbils_chi(path, out_path, p_value=0.01, double_check=False):
     files = find_csv(path)
     tot_files = len(files.values())
     i = 0
-    for dir in files.keys:
+    for dir in files.keys()[::-1]:
         print ' %i directories left'%(tot_files - i)
         i += 1 
         # make path if no there
@@ -100,9 +100,14 @@ def find_hornbils_chi(path, out_path, p_value=0.01, double_check=False):
         to_write = to_write[index]
         # change time
         to_write[:,1] = map(hms, to_write[:,1])
+        # change and remove events with duration less than 0.5 sec
+        to_write[:,2] = np.round(np.float32(to_write[:,2]) * 10**-3,3)
+        to_write = to_write[np.float32(to_write[:,2]) > 0.5]
+        # change original file from .csv to .MTS
+        to_write[:,4] = [j[:-3]+'MTS' for j in to_write[:,4]]
         # write file
         np.savetxt(os.path.join(write_path,'all.csv'), to_write,'%s', delimiter=','
-                   ,header='Frame_number, time(HH:MM:SS), Duration, max_chi, original_File' )
+                   ,header='Frame_number, time(HH:MM:SS), Duration (sec), max_chi, original_File' )
             
                 
  
