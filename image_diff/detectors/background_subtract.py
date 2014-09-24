@@ -1,7 +1,6 @@
 from base import Video
 import cv2
 import numpy as np
-import ipdb
 
 
 class Background_detect(Video):

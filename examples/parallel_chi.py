@@ -1,6 +1,5 @@
-#/usr/bin/python2
-
-from __init__ import Reduced_chi
+#!/usr/bin/python2
+from image_diff.detectors import Reduced_chi
 import mpi4py.MPI as mpi
 import sys
 
@@ -17,4 +16,4 @@ if video.rank == 0:
     # Make plot
     video.save_result()
     video.plot(show=False)
-    video.make_movie()
+    #video.make_movie()
